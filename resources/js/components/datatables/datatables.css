@@ -1,0 +1,304 @@
+/*
+ * Tema DataTables agar sesuai TailAdmin (light & dark).
+ * Pakai CSS variable Tailwind dengan fallback hex, jadi tetap jalan walau variable tidak ter-generate.
+ */
+
+.dt-container {
+    --dt-brand: var(--color-brand-500, #00a651);
+    --dt-brand-hover: var(--color-brand-600, #008f45);
+    --dt-brand-soft: var(--color-brand-50, #e6f7ec);
+    --dt-border: var(--color-gray-200, #e4e7ec);
+    --dt-input-border: var(--color-gray-300, #d0d5dd);
+    --dt-text: var(--color-gray-800, #1d2939);
+    --dt-muted: var(--color-gray-500, #667085);
+    --dt-row-hover: var(--color-gray-50, #f9fafb);
+    --dt-surface: #fff;
+
+    font-size: 14px;
+    color: var(--dt-muted);
+}
+
+.dark .dt-container {
+    --dt-border: var(--color-gray-800, #1d2939);
+    --dt-input-border: var(--color-gray-700, #344054);
+    --dt-text: rgb(255 255 255 / 0.9);
+    --dt-muted: var(--color-gray-400, #98a2b3);
+    --dt-row-hover: rgb(255 255 255 / 0.02);
+    --dt-surface: var(--color-gray-900, #101828);
+    --dt-brand-soft: rgb(0 166 81 / 0.12);
+}
+
+/* ---------- Toolbar atas / bawah ---------- */
+.dt-container .dt-layout-row {
+    margin: 0 !important;
+    padding: 16px 20px;
+    align-items: center;
+    gap: 12px;
+}
+
+.dt-container .dt-layout-row:first-child {
+    border-bottom: 1px solid var(--dt-border);
+}
+
+.dt-container .dt-layout-row:last-child {
+    border-top: 1px solid var(--dt-border);
+}
+
+.dt-container .dt-layout-row.dt-layout-table {
+    padding: 0;
+    border: 0;
+    overflow-x: auto;
+}
+
+.dt-container .dt-search input,
+.dt-container .dt-length select {
+    height: 44px;
+    border: 1px solid var(--dt-input-border) !important;
+    border-radius: 8px !important;
+    background-color: transparent !important;
+    color: var(--dt-text) !important;
+    padding: 10px 16px !important;
+    font-size: 14px;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 0.05);
+    outline: none;
+}
+
+.dark .dt-container .dt-search input,
+.dark .dt-container .dt-length select {
+    background-color: var(--dt-surface) !important;
+}
+
+.dt-container .dt-search input {
+    width: 280px;
+    margin-left: 0 !important;
+}
+
+/* Panah custom dengan jarak dari border (sama seperti utility select-chevron di app.css) */
+.dt-container .dt-length select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23667085' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+    padding-right: 40px !important;
+    margin-right: 8px;
+}
+
+.dark .dt-container .dt-length select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%2398A2B3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.dt-container .dt-search input:focus,
+.dt-container .dt-length select:focus {
+    border-color: var(--color-brand-300, #66cd8d) !important;
+    box-shadow: 0 0 0 4px rgb(0 166 81 / 0.12);
+}
+
+.dt-container .dt-search input::placeholder {
+    color: var(--color-gray-400, #98a2b3);
+}
+
+/* ---------- Tabel ---------- */
+table.dataTable {
+    width: 100% !important;
+    margin: 0 !important;
+    border-collapse: collapse !important;
+}
+
+table.dataTable > thead > tr > th {
+    padding: 12px 20px !important;
+    border-bottom: 1px solid var(--dt-border) !important;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--dt-muted);
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+table.dataTable > tbody > tr {
+    background: transparent !important;
+}
+
+table.dataTable > tbody > tr > td {
+    padding: 16px 20px !important;
+    border-top: 1px solid var(--dt-border) !important;
+    color: var(--dt-muted);
+    vertical-align: middle;
+    text-align: left !important;
+}
+
+table.dataTable > tbody > tr:hover > td {
+    background: var(--dt-row-hover);
+    box-shadow: none !important;
+}
+
+table.dataTable > tbody > tr > td.dt-right {
+    text-align: right !important;
+}
+
+table.dataTable td.dt-nowrap {
+    white-space: nowrap;
+}
+
+table.dataTable > thead > tr > th.dt-orderable-asc:hover,
+table.dataTable > thead > tr > th.dt-orderable-desc:hover {
+    outline: none !important;
+    color: var(--dt-text);
+}
+
+table.dataTable > thead > tr > th.dt-ordering-asc,
+table.dataTable > thead > tr > th.dt-ordering-desc {
+    color: var(--dt-brand);
+}
+
+table.dataTable td.dt-empty {
+    padding: 40px 20px !important;
+    text-align: center !important;
+}
+
+/* Isi sel */
+.dt-strong {
+    font-weight: 500;
+    color: var(--dt-text);
+}
+
+.dt-sub {
+    font-size: 12px;
+    color: var(--dt-muted);
+}
+
+.dt-muted {
+    color: var(--color-gray-400, #98a2b3);
+}
+
+.dt-badge {
+    display: inline-block;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+}
+
+.dt-badge-success {
+    background: var(--color-success-50, #ecfdf3);
+    color: var(--color-success-600, #039855);
+}
+
+.dt-badge-error {
+    background: var(--color-error-50, #fef3f2);
+    color: var(--color-error-600, #d92d20);
+}
+
+.dt-badge-warning {
+    background: var(--color-warning-50, #fffaeb);
+    color: var(--color-warning-600, #dc6803);
+}
+
+.dark .dt-badge-warning {
+    background: rgb(247 144 9 / 0.15);
+    color: #fb923c;
+}
+
+.dt-badge-gray {
+    background: var(--color-gray-100, #f2f4f7);
+    color: var(--color-gray-600, #475467);
+    padding: 2px 8px;
+}
+
+.dark .dt-badge-success {
+    background: rgb(18 183 106 / 0.15);
+    color: var(--color-success-500, #12b76a);
+}
+
+.dark .dt-badge-error {
+    background: rgb(240 68 56 / 0.15);
+    color: var(--color-error-500, #f04438);
+}
+
+.dark .dt-badge-gray {
+    background: var(--color-gray-800, #1d2939);
+    color: var(--color-gray-400, #98a2b3);
+}
+
+.dt-btn {
+    display: inline-block;
+    border: 1px solid var(--dt-input-border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: 500;
+    color: var(--color-gray-700, #344054);
+    white-space: nowrap;
+}
+
+.dt-btn:hover {
+    background: var(--color-gray-50, #f9fafb);
+}
+
+.dark .dt-btn {
+    color: var(--color-gray-400, #98a2b3);
+}
+
+.dark .dt-btn:hover {
+    background: rgb(255 255 255 / 0.03);
+}
+
+/* ---------- Info & pagination ---------- */
+.dt-container .dt-info {
+    padding: 0 !important;
+    color: var(--dt-muted);
+}
+
+.dt-container .dt-paging .dt-paging-button {
+    min-width: 36px;
+    height: 36px;
+    margin: 0 2px !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--dt-input-border) !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    color: var(--color-gray-700, #344054) !important;
+    font-size: 14px;
+    line-height: 34px;
+}
+
+.dark .dt-container .dt-paging .dt-paging-button {
+    color: var(--color-gray-400, #98a2b3) !important;
+}
+
+.dt-container .dt-paging .dt-paging-button:hover:not(.disabled):not(.current) {
+    background: var(--dt-brand-soft) !important;
+    border-color: var(--dt-brand) !important;
+    color: var(--dt-brand) !important;
+}
+
+.dt-container .dt-paging .dt-paging-button.current,
+.dt-container .dt-paging .dt-paging-button.current:hover {
+    background: var(--dt-brand) !important;
+    border-color: var(--dt-brand) !important;
+    color: #fff !important;
+}
+
+.dt-container .dt-paging .dt-paging-button.disabled {
+    opacity: 0.4;
+}
+
+/* ---------- Loading ---------- */
+.dt-container div.dt-processing {
+    border: 1px solid var(--dt-border);
+    border-radius: 12px;
+    background: var(--dt-surface);
+    color: var(--dt-text);
+    box-shadow: 0 12px 16px -4px rgb(16 24 40 / 0.08);
+    padding: 12px 20px;
+}
+
+.dt-container div.dt-processing > div:last-child > div {
+    background: var(--dt-brand);
+}
+
+@media (max-width: 767px) {
+    .dt-container .dt-search input {
+        width: 100%;
+    }
+}

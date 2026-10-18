@@ -1,0 +1,145 @@
+<?php
+
+use App\Models\Member;
+use App\Models\Payment;
+use App\Payments\Data\TxStatus;
+use App\Payments\Gateways\YoduGateway;
+use App\Payments\Yodu\YoduSigner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+
+uses(RefreshDatabase::class);
+
+const BASE = 'https://sandbox.yodu.test';
+
+beforeEach(function () {
+    config(['yodu' => array_merge(config('yodu'), [
+        'driver' => 'yodu',
+        'base_url' => BASE,
+        'client_id' => 'CLIENT-ID',
+        'client_secret' => 'CLIENT-SECRET',
+        'private_key_path' => 'tests/Fixtures/yodu-test-private.pem',
+        'channel_id' => '95221',
+        'merchant_id' => 'M001',
+        'store_id' => 'S001',
+        'terminal_id' => 'T001',
+        'qr_expiry_seconds' => 900,
+        'transaction_client_key_header' => false,
+    ])]);
+    Cache::flush();
+
+    $this->payment = Payment::create([
+        'member_id' => Member::factory()->create()->id,
+        'gateway' => 'yodu',
+        'merchant_ref' => 'KLK0007-261012170105-ABC123',
+        'amount' => 300000,
+        'status' => Payment::PENDING,
+        'gateway_ref' => 'YODU-REF-1',
+    ]);
+});
+
+function tokenResponse(): array
+{
+    return ['responseCode' => '2007300', 'accessToken' => str_repeat('t', 64), 'expiresIn' => '900'];
+}
+
+test('generate QR sends a signed SNAP request and parses the QR', function () {
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/mpm/generate' => Http::response([
+            'responseCode' => '2004700', 'responseMessage' => 'Successful', 'referenceNo' => 'YODU-REF-9',
+            'responseData' => ['qrContent' => '00020101021226QRIS', 'qrReffId' => 'QR-9', 'validityPeriod' => '2026-10-12T17:15:00+07:00'],
+        ]),
+    ]);
+
+    $qr = app(YoduGateway::class, ['config' => config('yodu')])->createQr($this->payment);
+
+    expect($qr->qrString)->toBe('00020101021226QRIS')
+        ->and($qr->gatewayRef)->toBe('YODU-REF-9')
+        ->and($qr->gatewayQrId)->toBe('QR-9');
+
+    Http::assertSent(function (Request $r) {
+        if (! str_ends_with($r->url(), '/qr-acq/mpm/generate')) {
+            return false;
+        }
+
+        $body = json_decode($r->body(), true);
+        $expectedSig = (new YoduSigner('CLIENT-ID', 'CLIENT-SECRET', ''))
+            ->symmetric('POST', '/openapi/v1.0/qr-acq/mpm/generate', str_repeat('t', 64), $r->body(), $r->header('X-TIMESTAMP')[0]);
+
+        return $body['partnerReferenceNo'] === 'KLK0007-261012170105-ABC123'
+            && $body['amount'] === ['value' => '300000.00', 'currency' => 'IDR']
+            && $body['qrType'] === '03'
+            && $r->header('X-SIGNATURE')[0] === $expectedSig
+            && $r->header('Authorization')[0] === 'Bearer '.str_repeat('t', 64)
+            && $r->header('X-PARTNER-ID')[0] === 'CLIENT-ID'
+            && $r->header('CHANNEL-ID')[0] === '95221'
+            && ! $r->hasHeader('X-CLIENT-KEY')            // secret tidak dikirim di header
+            && ! str_contains($r->body(), ' ');            // body = string minified yang di-hash
+    });
+});
+
+test('access token is cached and refreshed once when rejected', function () {
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::sequence()
+            ->push(['responseCode' => '4017300', 'responseMessage' => 'Invalid token'], 401)
+            ->push(['responseCode' => '2005100', 'responseData' => ['latestTransactionStatus' => '03']])
+            ->push(['responseCode' => '2005100', 'responseData' => ['latestTransactionStatus' => '03']]),
+    ]);
+
+    $gateway = app(YoduGateway::class, ['config' => config('yodu')]);
+    $gateway->checkStatus($this->payment);
+    $gateway->checkStatus($this->payment);
+
+    $tokenCalls = collect(Http::recorded())->filter(fn ($pair) => str_ends_with($pair[0]->url(), '/access/token'))->count();
+    expect($tokenCalls)->toBe(2); // 1x awal + 1x setelah 401; cek status kedua memakai cache
+});
+
+test('status codes are mapped and the reference is taken from our own payment', function (string $code, string $expected) {
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response(['responseCode' => '2005100', 'responseData' => [
+            'originalPartnerReferenceNo' => 'MILIK-ORANG-LAIN',
+            'latestTransactionStatus' => $code,
+            'payAmount' => ['value' => '300000.00'], 'amount' => ['value' => '297900.00'],
+            'mdrAmount' => ['value' => '2100.00'], 'issuerName' => 'GoPay', 'paidTime' => '2026-10-12T17:03:41+07:00',
+        ]]),
+    ]);
+
+    $tx = app(YoduGateway::class, ['config' => config('yodu')])->checkStatus($this->payment);
+
+    expect($tx->status)->toBe($expected)
+        ->and($tx->merchantRef)->toBe('KLK0007-261012170105-ABC123')
+        ->and($tx->payAmount)->toBe(300000)
+        ->and($tx->netAmount)->toBe(297900)
+        ->and($tx->channel)->toBe('GoPay');
+})->with([
+    ['00', TxStatus::SUCCESS],
+    ['03', TxStatus::PENDING],
+    ['04', TxStatus::REFUNDED],
+    ['05', TxStatus::CANCELLED],
+    ['06', TxStatus::FAILED],
+]);
+
+test('transaction not found means still pending, other errors mean unknown', function () {
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::sequence()
+            ->push(['responseCode' => '5008203', 'responseMessage' => 'Transaction Not Found'], 404)
+            ->push(['responseCode' => '5005100', 'responseMessage' => 'General Error'], 500),
+    ]);
+
+    $gateway = app(YoduGateway::class, ['config' => config('yodu')]);
+
+    expect($gateway->checkStatus($this->payment)?->status)->toBe(TxStatus::PENDING)
+        ->and($gateway->checkStatus($this->payment))->toBeNull();
+});
+
+test('incomplete YODU configuration fails with a clear message', function () {
+    config(['yodu.merchant_id' => null]);
+
+    app(YoduGateway::class, ['config' => config('yodu')])->createQr($this->payment);
+})->throws(RuntimeException::class, 'yodu.merchant_id');
