@@ -24,7 +24,8 @@ class DefaultAssetSeeder extends Seeder
             $disk = Storage::disk($asset['disk']);
 
             if (! $disk->exists($asset['path'])) {
-                $disk->put($asset['path'], file_get_contents(base_path($asset['source'])), 'public');
+                // Tanpa argumen visibility: bucket Laravel Cloud (R2) menolak ACL per file — visibility diatur per bucket.
+                $disk->put($asset['path'], file_get_contents(base_path($asset['source'])));
             }
         }
     }
