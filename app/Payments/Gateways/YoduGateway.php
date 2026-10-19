@@ -10,6 +10,7 @@ use App\Payments\Yodu\YoduClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -122,6 +123,7 @@ class YoduGateway implements PaymentGateway
             'code' => $json['responseCode'] ?? null,
             'message' => $json['responseMessage'] ?? null,
             'tx_status' => $json['responseData']['latestTransactionStatus'] ?? null,
+            'body' => Str::limit((string) json_encode($json), 3000),
         ]);
 
         if (! YoduClient::isSuccess($json)) {
