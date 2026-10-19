@@ -9,6 +9,7 @@ use App\Payments\Data\TxStatus;
 use App\Payments\Yodu\YoduClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -113,6 +114,15 @@ class YoduGateway implements PaymentGateway
         }
 
         $json = $res['body'];
+
+        // Jejak jawaban YODU per cek status — tanpa ini "masih pending" tidak bisa dibedakan dari "ditolak YODU"
+        Log::info('YODU cek status', [
+            'ref' => $payment->merchant_ref,
+            'http' => $res['http'],
+            'code' => $json['responseCode'] ?? null,
+            'message' => $json['responseMessage'] ?? null,
+            'tx_status' => $json['responseData']['latestTransactionStatus'] ?? null,
+        ]);
 
         if (! YoduClient::isSuccess($json)) {
             // Transaction Not Found = belum ada pembayaran

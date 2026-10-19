@@ -29,12 +29,13 @@ return [
     'store_id' => env('YODU_STORE_ID'),
     'terminal_id' => env('YODU_TERMINAL_ID'),
 
-    'qr_expiry_seconds' => (int) env('YODU_QR_EXPIRY', 900),           // default YODU 300 detik
+    'qr_expiry_seconds' => (int) env('YODU_QR_EXPIRY', 300),           // = default YODU (Spec MPM: 300 detik)
     'signature_encoding' => env('YODU_SIGNATURE_ENCODING', 'base64'),   // 'hex' kalau sandbox menolak signature
     // Kosong = semua IP diterima, tapi SUCCESS dari callback tetap dikonfirmasi ke API cek status.
     'callback_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('YODU_CALLBACK_IPS', ''))))),
-    // Kirim client secret di header X-CLIENT-KEY pada request transaksi — hanya kalau YODU memintanya.
-    'transaction_client_key_header' => (bool) env('YODU_TX_CLIENT_KEY_HEADER', false),
+    // Client secret di header X-CLIENT-KEY pada request transaksi. Wajib menurut Spec Doc YODU Security API
+    // (tanpa header ini generate QR ditolak 4008001); bisa dimatikan untuk gateway SNAP lain yang tidak memintanya.
+    'transaction_client_key_header' => filter_var(env('YODU_TX_CLIENT_KEY_HEADER', true), FILTER_VALIDATE_BOOL),
     'origin' => env('YODU_ORIGIN'),
     'timeout' => (int) env('YODU_TIMEOUT', 30),
 ];
