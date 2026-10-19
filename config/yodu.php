@@ -6,7 +6,10 @@
 |   Configuration → Access API           : Client ID, Client Secret Key (isi Public Key & Callback URL di sana)
 |   Profile → Company Profile → API Info : Merchant ID, Channel ID, Store ID, Terminal ID
 |
-| Private key RSA disimpan di luar repo (storage/app/private/keys, ter-gitignore) — JANGAN di-commit.
+| Private key RSA disimpan di luar repo — JANGAN di-commit:
+|   - Server (Laravel Cloud, filesystem tidak permanen): YODU_PRIVATE_KEY = isi PEM di-base64
+|     (generate: `base64 -w0 yodu-private.pem`). Kalau diisi, YODU_PRIVATE_KEY_PATH diabaikan.
+|   - Lokal: file di storage/app/private/keys (ter-gitignore) lewat YODU_PRIVATE_KEY_PATH.
 */
 return [
     // 'yodu' = sungguhan (sandbox/production) | 'fake' = simulasi lokal tanpa YODU (ditolak di production)
@@ -18,6 +21,7 @@ return [
 
     'client_id' => env('YODU_CLIENT_ID'),
     'client_secret' => env('YODU_CLIENT_SECRET'),
+    'private_key' => env('YODU_PRIVATE_KEY'),
     'private_key_path' => env('YODU_PRIVATE_KEY_PATH', 'storage/app/private/keys/yodu-private.pem'),
 
     'channel_id' => env('YODU_CHANNEL_ID'),

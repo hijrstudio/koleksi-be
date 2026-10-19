@@ -31,18 +31,33 @@ class YoduClient
             }
         }
 
+        return new self($c, new YoduSigner(
+            $c['client_id'],
+            $c['client_secret'],
+            self::privateKeyPem($c),
+            $c['signature_encoding'] ?? 'base64',
+        ));
+    }
+
+    /** YODU_PRIVATE_KEY (PEM di-base64, untuk server) didahulukan; kalau kosong baru baca file YODU_PRIVATE_KEY_PATH. */
+    private static function privateKeyPem(array $c): string
+    {
+        if (filled($c['private_key'] ?? null)) {
+            $pem = base64_decode((string) $c['private_key'], true);
+            if (! $pem || ! str_contains($pem, '-----BEGIN')) {
+                throw new RuntimeException('YODU_PRIVATE_KEY bukan PEM yang di-base64 (generate: base64 -w0 yodu-private.pem).');
+            }
+
+            return $pem;
+        }
+
         $path = base_path($c['private_key_path']);
         $pem = is_readable($path) ? file_get_contents($path) : false;
         if (! $pem) {
             throw new RuntimeException("Private key YODU tidak ditemukan / tidak bisa dibaca: {$c['private_key_path']}");
         }
 
-        return new self($c, new YoduSigner(
-            $c['client_id'],
-            $c['client_secret'],
-            $pem,
-            $c['signature_encoding'] ?? 'base64',
-        ));
+        return $pem;
     }
 
     /** Waktu Jakarta ISO-8601: 2026-10-08T12:00:00+07:00 */

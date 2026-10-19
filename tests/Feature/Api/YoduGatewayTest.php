@@ -4,6 +4,7 @@ use App\Models\Member;
 use App\Models\Payment;
 use App\Payments\Data\TxStatus;
 use App\Payments\Gateways\YoduGateway;
+use App\Payments\Yodu\YoduClient;
 use App\Payments\Yodu\YoduSigner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -20,6 +21,7 @@ beforeEach(function () {
         'base_url' => BASE,
         'client_id' => 'CLIENT-ID',
         'client_secret' => 'CLIENT-SECRET',
+        'private_key' => null,
         'private_key_path' => 'tests/Fixtures/yodu-test-private.pem',
         'channel_id' => '95221',
         'merchant_id' => 'M001',
@@ -143,3 +145,18 @@ test('incomplete YODU configuration fails with a clear message', function () {
 
     app(YoduGateway::class, ['config' => config('yodu')])->createQr($this->payment);
 })->throws(RuntimeException::class, 'yodu.merchant_id');
+
+test('private key from YODU_PRIVATE_KEY (base64 PEM) takes precedence over the file path', function () {
+    config([
+        'yodu.private_key' => base64_encode(file_get_contents(base_path('tests/Fixtures/yodu-test-private.pem'))),
+        'yodu.private_key_path' => 'tests/Fixtures/tidak-ada.pem',
+    ]);
+
+    expect(YoduClient::make())->toBeInstanceOf(YoduClient::class);
+});
+
+test('YODU_PRIVATE_KEY that is not a base64 PEM fails with a clear message', function () {
+    config(['yodu.private_key' => '-----BEGIN PRIVATE KEY----- bukan base64']);
+
+    YoduClient::make();
+})->throws(RuntimeException::class, 'YODU_PRIVATE_KEY');
