@@ -1,4 +1,4 @@
-{{-- Lonceng notifikasi CMS — data dari App\View\Components\header\NotificationDropdown --}}
+{{-- Lonceng notifikasi CMS — data dari App\View\Components\Header\NotificationDropdown --}}
 <div class="relative" x-data="{
     dropdownOpen: false,
     notifying: @js($unreadCount > 0),
