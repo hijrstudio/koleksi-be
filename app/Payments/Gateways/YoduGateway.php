@@ -116,13 +116,16 @@ class YoduGateway implements PaymentGateway
 
         $json = $res['body'];
 
+        // Spec: status ada di responseData. Sandbox YODU menjawab datar (seperti callback) → terima dua-duanya.
+        $data = isset($json['responseData']['latestTransactionStatus']) ? $json['responseData'] : $json;
+
         // Jejak jawaban YODU per cek status — tanpa ini "masih pending" tidak bisa dibedakan dari "ditolak YODU"
         Log::info('YODU cek status', [
             'ref' => $payment->merchant_ref,
             'http' => $res['http'],
             'code' => $json['responseCode'] ?? null,
             'message' => $json['responseMessage'] ?? null,
-            'tx_status' => $json['responseData']['latestTransactionStatus'] ?? null,
+            'tx_status' => $data['latestTransactionStatus'] ?? null,
             'body' => Str::limit((string) json_encode($json), 3000),
         ]);
 
@@ -135,7 +138,7 @@ class YoduGateway implements PaymentGateway
 
         // merchant_ref dipaksa dari payment kita (bukan dari jawaban), supaya tidak bisa "salah sasaran"
         return $this->toStatus(
-            ['originalPartnerReferenceNo' => $payment->merchant_ref] + ($json['responseData'] ?? []),
+            ['originalPartnerReferenceNo' => $payment->merchant_ref] + (is_array($data) ? $data : []),
             fromCallback: false,
         );
     }
@@ -143,18 +146,50 @@ class YoduGateway implements PaymentGateway
     /**
      * Spec YODU belum menjelaskan cara verifikasi signature callback.
      * Lapis 1: whitelist IP (YODU_CALLBACK_IPS, kalau diberi YODU).
-     * Lapis 2 (di PaymentService): SUCCESS dari callback SELALU dikonfirmasi ke API cek status.
+     * Lapis 2: YODU mengirim client secret kita di header X-CLIENT-KEY → wajib cocok.
+     * Lapis 3 (di PaymentService): SUCCESS dari callback SELALU dikonfirmasi ke API cek status.
      */
     public function verifyCallback(Request $request): bool
     {
         $ips = $this->config['callback_ips'] ?? [];
+        if ($ips !== [] && ! in_array($request->ip(), $ips, true)) {
+            return false;
+        }
 
-        return $ips === [] || in_array($request->ip(), $ips, true);
+        $secret = (string) ($this->config['client_secret'] ?? '');
+
+        return $secret === '' || hash_equals($secret, (string) $request->header('X-CLIENT-KEY'));
     }
 
     public function parseCallback(Request $request): TxStatus
     {
-        return $this->toStatus($request->json()->all(), fromCallback: true);
+        $d = $request->json()->all();
+        $d['originalPartnerReferenceNo'] = $this->callbackMerchantRef($d);
+
+        return $this->toStatus($d, fromCallback: true);
+    }
+
+    /**
+     * Sandbox YODU mengisi originalPartnerReferenceNo dengan referenceNo miliknya sendiri (bukan nomor kita),
+     * jadi payment juga dicari lewat referenceNo (gateway_ref) & qrReffId (gateway_qr_id) dari generate QR.
+     */
+    private function callbackMerchantRef(array $d): string
+    {
+        $ref = (string) ($d['originalPartnerReferenceNo'] ?? '');
+
+        $payment = Payment::where('gateway', $this->name())
+            ->where(function ($q) use ($d, $ref) {
+                $q->where('merchant_ref', $ref);
+                if (filled($d['originalReferenceNo'] ?? null)) {
+                    $q->orWhere('gateway_ref', (string) $d['originalReferenceNo']);
+                }
+                if (filled($d['qrReffId'] ?? null)) {
+                    $q->orWhere('gateway_qr_id', (string) $d['qrReffId']);
+                }
+            })
+            ->first();
+
+        return $payment->merchant_ref ?? $ref;
     }
 
     public function callbackResponse(bool $ok, array $payload = []): Response

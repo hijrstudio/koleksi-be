@@ -146,6 +146,55 @@ test('incomplete YODU configuration fails with a clear message', function () {
     app(YoduGateway::class, ['config' => config('yodu')])->createQr($this->payment);
 })->throws(RuntimeException::class, 'yodu.merchant_id');
 
+/** Callback asli dari sandbox YODU: originalPartnerReferenceNo berisi referenceNo milik YODU, bukan nomor kita. */
+function sandboxCallback(): array
+{
+    return [
+        'originalReferenceNo' => 'YODU-REF-1',
+        'originalPartnerReferenceNo' => 'YODU-REF-1',
+        'qrReffId' => 'QR-1',
+        'latestTransactionStatus' => '00',
+        'transactionStatusDesc' => 'Success',
+        'customerPan' => '936008303260500131',
+        'merchantId' => '261000294',
+        'destinationAccountName' => 'MOBIL LISTRIK',
+        'amount' => ['value' => '300000.0', 'currency' => 'IDR'],
+        'payAmount' => ['value' => '300000.0', 'currency' => 'IDR'],
+        'feeAmount' => ['value' => '0.0', 'currency' => 'IDR'],
+        'mdrAmount' => ['value' => '0.0', 'currency' => 'IDR'],
+        'handlingFee' => ['value' => '0', 'currency' => 'IDR'],
+        'additionalData' => [],
+    ];
+}
+
+test('sandbox callback is matched by YODU reference and confirmed by a flat status response', function () {
+    $this->payment->update(['gateway_qr_id' => 'QR-1']);
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        // Sandbox menjawab cek status tanpa responseData (datar, seperti callback)
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response(
+            ['responseCode' => '2008200', 'responseMessage' => 'Approved'] + sandboxCallback()
+        ),
+    ]);
+
+    $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
+        ->assertOk()
+        ->assertJsonPath('responseCode', '00');
+
+    $log = \App\Models\PaymentNotification::first();
+    expect($this->payment->fresh()->status)->toBe(Payment::SUCCESS)
+        ->and($log->merchant_ref)->toBe('KLK0007-261012170105-ABC123')
+        ->and($log->headers)->not->toHaveKey('x-client-key');
+});
+
+test('callback with a wrong X-CLIENT-KEY is rejected', function () {
+    $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'salah'])
+        ->assertOk()
+        ->assertJsonPath('responseCode', '01');
+
+    expect($this->payment->fresh()->status)->toBe(Payment::PENDING);
+});
+
 test('private key from YODU_PRIVATE_KEY (base64 PEM) takes precedence over the file path', function () {
     config([
         'yodu.private_key' => base64_encode(file_get_contents(base_path('tests/Fixtures/yodu-test-private.pem'))),

@@ -35,7 +35,7 @@ class YoduCallbackController extends Controller
             'gateway_status' => Str::limit((string) ($payload['latestTransactionStatus'] ?? $payload['status'] ?? ''), 10, '') ?: null,
             'ip' => $request->ip(),
             'headers' => collect($request->headers->all())
-                ->except(['cookie', 'authorization'])
+                ->except(['cookie', 'authorization', 'x-client-key']) // x-client-key = client secret kita
                 ->map(fn ($v) => Str::limit((string) ($v[0] ?? ''), 500))->all(),
             'body' => Str::limit($body, self::MAX_BODY_BYTES, ''),
         ]);
@@ -46,8 +46,8 @@ class YoduCallbackController extends Controller
             return $gateway->callbackResponse(false, $payload);
         }
 
-        $log->update(['accepted' => true]);
         $tx = $gateway->parseCallback($request);
+        $log->update(['accepted' => true, 'merchant_ref' => Str::limit($tx->merchantRef, 64, '') ?: $log->merchant_ref]);
 
         dispatch(function () use ($tx, $log) {
             try {
