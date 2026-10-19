@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             SuperAdminSeeder::class,
             VehicleBrandSeeder::class,
             RegionSeeder::class,
+            DefaultAssetSeeder::class,
         ]);
     }
 }
