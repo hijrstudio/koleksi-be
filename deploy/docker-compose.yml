@@ -1,0 +1,127 @@
+# Stack produksi VPS: Caddy (HTTPS) -> fe (Next.js) & app (Laravel), + worker, scheduler, MySQL, Redis.
+# Struktur di server:  ~/koleksi/be (repo koleksi-be)  &  ~/koleksi/fe (repo koleksi-fe)
+# Jalankan dari folder ini lewat ./deploy.sh. Variabel ${...} diambil dari deploy/.env.
+
+name: koleksi
+
+x-backend: &backend
+  image: koleksi-be:latest
+  env_file: ../.env
+  environment:
+    APP_URL: https://${API_DOMAIN}
+    FRONTEND_URL: https://${FE_DOMAIN}
+    FRONTEND_API_TOKEN: ${BACKEND_API_TOKEN}
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: ${DB_DATABASE}
+    DB_USERNAME: ${DB_USERNAME}
+    DB_PASSWORD: ${DB_PASSWORD}
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    SESSION_DRIVER: redis
+  volumes:
+    - storage:/app/storage
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_started
+  restart: unless-stopped
+
+services:
+  app:
+    <<: *backend
+    build:
+      context: ..
+
+  worker:
+    <<: *backend
+    pull_policy: never
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    healthcheck:
+      disable: true
+
+  scheduler:
+    <<: *backend
+    pull_policy: never
+    command: ["php", "artisan", "schedule:work"]
+    healthcheck:
+      disable: true
+
+  fe:
+    image: koleksi-fe:latest
+    build:
+      context: ../../fe
+      args:
+        BACKEND_API_URL: https://${API_DOMAIN}/api/v1
+        BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
+      secrets:
+        - backend_api_token
+    environment:
+      BACKEND_API_URL: https://${API_DOMAIN}/api/v1
+      BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
+      BACKEND_API_TOKEN: ${BACKEND_API_TOKEN}
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FE_DOMAIN: ${FE_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      default:
+        # fe memanggil https://API_DOMAIN langsung ke Caddy lewat jaringan internal, tanpa keluar ke internet
+        aliases:
+          - ${API_DOMAIN}
+    # Sengaja tidak depend ke fe: build fe butuh API yang sudah online (prerender ISR)
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    restart: unless-stopped
+
+secrets:
+  backend_api_token:
+    environment: BACKEND_API_TOKEN
+
+volumes:
+  storage:
+  mysql:
+  redis:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,25 @@
+# Deploy ke VPS setiap push ke main. Aktif hanya kalau repository variable VPS_DEPLOY = "true".
+# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY
+name: Deploy VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.VPS_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
+          script: bash ~/koleksi/be/deploy/deploy.sh

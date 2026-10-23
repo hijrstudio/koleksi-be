@@ -1,0 +1,31 @@
+# Caddy edge: HTTPS otomatis (Let's Encrypt) untuk domain FE & API.
+{
+	email {$ACME_EMAIL}
+}
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+www.{$FE_DOMAIN} {
+	redir https://{$FE_DOMAIN}{uri} permanent
+}
+
+{$FE_DOMAIN} {
+	import security
+	encode zstd gzip
+	reverse_proxy fe:3000
+}
+
+{$API_DOMAIN} {
+	import security
+	request_body {
+		max_size 25MB
+	}
+	reverse_proxy app:8080
+}

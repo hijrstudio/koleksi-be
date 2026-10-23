@@ -1,0 +1,12 @@
+# Server internal di container app. TLS ditangani Caddy edge (deploy/Caddyfile).
+{
+	frankenphp
+	auto_https off
+	admin off
+}
+
+:8080 {
+	root * /app/public
+	encode zstd br gzip
+	php_server
+}
