@@ -4,13 +4,17 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Push ke koleksi-be & koleksi-fe bisa memicu deploy bersamaan: jalankan bergiliran
-exec 9>/tmp/koleksi-deploy.lock
-flock 9
+if [ "${KOLEKSI_DEPLOY_UPDATED:-}" != 1 ]; then
+  # Push ke koleksi-be & koleksi-fe bisa memicu deploy bersamaan: jalankan bergiliran.
+  # Lock (fd 9) tetap dipegang setelah exec di bawah.
+  exec 9>/tmp/koleksi-deploy.lock
+  flock 9
+  # git pull bisa mengubah skrip ini saat sedang dibaca bash: tarik dulu, lalu jalankan versi terbaru dari awal
+  git -C .. pull --ff-only
+  KOLEKSI_DEPLOY_UPDATED=1 exec bash "$0" "$@"
+fi
 
 set -a; . ./.env; set +a
-
-git -C .. pull --ff-only
 
 docker compose pull app fe
 # </dev/null: `compose run` membaca stdin & bisa menelan sisa skrip
