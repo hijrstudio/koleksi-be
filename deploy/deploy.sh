@@ -4,6 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Push ke koleksi-be & koleksi-fe bisa memicu deploy bersamaan: jalankan bergiliran
+exec 9>/tmp/koleksi-deploy.lock
+flock 9
+
 set -a; . ./.env; set +a
 
 git -C .. pull --ff-only
