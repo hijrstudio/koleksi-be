@@ -24,8 +24,9 @@ docker compose up -d --remove-orphans </dev/null
 # `compose up` tidak selalu mendeteksi tag :latest yang berubah: ganti container yang image-nya tertinggal
 for svc in app fe; do
   cid=$(docker compose ps -q "$svc" </dev/null)
-  img=$(docker compose config --images "$svc" </dev/null)
-  if [ -n "$cid" ] && [ "$(docker inspect -f '{{.Image}}' "$cid")" != "$(docker image inspect -f '{{.Id}}' "$img")" ]; then
+  [ -n "$cid" ] || continue
+  img=$(docker inspect -f '{{.Config.Image}}' "$cid")
+  if [ "$(docker inspect -f '{{.Image}}' "$cid")" != "$(docker image inspect -f '{{.Id}}' "$img")" ]; then
     echo "image $svc berubah -> recreate"
     docker compose up -d --no-deps --force-recreate "$svc" </dev/null
   fi
