@@ -1,0 +1,26 @@
+# Opsional, untuk VPS yang port 80/443-nya bebas (KVM/dedicated IP, tanpa panel seperti Webuzo).
+# Aktifkan di deploy/.env:  COMPOSE_FILE=docker-compose.yml:docker-compose.caddy.yml
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FE_DOMAIN: ${FE_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # Sengaja tidak depend ke fe: build fe butuh API yang sudah online (prerender ISR)
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

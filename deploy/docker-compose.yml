@@ -1,6 +1,10 @@
-# Stack produksi VPS: Caddy (HTTPS) -> fe (Next.js) & app (Laravel), + worker, scheduler, MySQL, Redis.
+# Stack produksi VPS: fe (Next.js) & app (Laravel) + worker, scheduler, MySQL, Redis.
 # Struktur di server:  ~/koleksi/be (repo koleksi-be)  &  ~/koleksi/fe (repo koleksi-fe)
 # Jalankan dari folder ini lewat ./deploy.sh. Variabel ${...} diambil dari deploy/.env.
+#
+# HTTPS ditangani di depan stack ini, salah satu dari:
+#   - Apache Webuzo (VPS Hosting Jagoan): reverse proxy ke 127.0.0.1:FE_PORT & APP_PORT -> lihat deploy/webuzo/
+#   - Caddy (VPS biasa/KVM): tambahkan docker-compose.caddy.yml lewat COMPOSE_FILE di deploy/.env
 
 name: koleksi
 
@@ -31,11 +35,18 @@ x-backend: &backend
       condition: service_started
   restart: unless-stopped
 
+# fe memanggil https://API_DOMAIN lewat web server di host (Apache/Caddy), bukan lewat internet:
+# NAT VPS belum tentu mendukung koneksi balik (hairpin) ke IP publiknya sendiri.
+x-api-host: &api-host
+  - "${API_DOMAIN}:${HOST_GATEWAY:-host-gateway}"
+
 services:
   app:
     <<: *backend
     build:
       context: ..
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
 
   worker:
     <<: *backend
@@ -60,34 +71,15 @@ services:
         BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
       secrets:
         - backend_api_token
+      # Prerender ISR saat build memanggil API
+      extra_hosts: *api-host
     environment:
       BACKEND_API_URL: https://${API_DOMAIN}/api/v1
       BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
       BACKEND_API_TOKEN: ${BACKEND_API_TOKEN}
-    depends_on:
-      - app
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
+    extra_hosts: *api-host
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      FE_DOMAIN: ${FE_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
-      ACME_EMAIL: ${ACME_EMAIL}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      default:
-        # fe memanggil https://API_DOMAIN langsung ke Caddy lewat jaringan internal, tanpa keluar ke internet
-        aliases:
-          - ${API_DOMAIN}
-    # Sengaja tidak depend ke fe: build fe butuh API yang sudah online (prerender ISR)
+      - "127.0.0.1:${FE_PORT:-3000}:3000"
     depends_on:
       - app
     restart: unless-stopped
@@ -123,5 +115,3 @@ volumes:
   storage:
   mysql:
   redis:
-  caddy_data:
-  caddy_config:

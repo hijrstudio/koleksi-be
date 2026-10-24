@@ -1,5 +1,5 @@
 # Deploy ke VPS setiap push ke main. Aktif hanya kalau repository variable VPS_DEPLOY = "true".
-# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY
+# Secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT (opsional, default 22; VPS NAT Jagoan: 50012)
 name: Deploy VPS
 
 on:
@@ -19,6 +19,7 @@ jobs:
       - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 30m
