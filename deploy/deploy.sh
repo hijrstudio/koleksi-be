@@ -16,5 +16,15 @@ docker compose pull app fe
 # </dev/null: `compose run` membaca stdin & bisa menelan sisa skrip
 docker compose run --rm -T app php artisan migrate --force </dev/null
 docker compose up -d --remove-orphans </dev/null
+
+# `compose up` tidak selalu mendeteksi tag :latest yang berubah: ganti container yang image-nya tertinggal
+for svc in app fe; do
+  cid=$(docker compose ps -q "$svc" </dev/null)
+  img=$(docker compose config --images "$svc" </dev/null)
+  if [ -n "$cid" ] && [ "$(docker inspect -f '{{.Image}}' "$cid")" != "$(docker image inspect -f '{{.Id}}' "$img")" ]; then
+    echo "image $svc berubah -> recreate"
+    docker compose up -d --no-deps --force-recreate "$svc" </dev/null
+  fi
+done
 docker image prune -f >/dev/null
 docker compose ps </dev/null
