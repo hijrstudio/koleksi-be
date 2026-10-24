@@ -1,110 +1,73 @@
-# Stack produksi VPS: fe (Next.js) & app (Laravel) + worker, scheduler, MySQL, Redis.
+# Stack produksi VPS: app (Laravel: web + queue + scheduler) & fe (Next.js). Hanya 2 container.
 # Struktur di server:  ~/koleksi/be (repo koleksi-be)  &  ~/koleksi/fe (repo koleksi-fe)
 # Jalankan dari folder ini lewat ./deploy.sh. Variabel ${...} diambil dari deploy/.env.
 #
-# HTTPS ditangani di depan stack ini, salah satu dari:
-#   - Apache Webuzo (VPS Hosting Jagoan): reverse proxy ke 127.0.0.1:FE_PORT & APP_PORT -> lihat deploy/webuzo/
-#   - Caddy (VPS biasa/KVM): tambahkan docker-compose.caddy.yml lewat COMPOSE_FILE di deploy/.env
+# Dirancang untuk VPS OpenVZ dengan batas thread per VPS yang ketat (VPS Hosting Jagoan + Webuzo):
+#   - network_mode host: tanpa docker-proxy & NAT bridge; app/fe hanya listen di 127.0.0.1
+#   - database = MariaDB bawaan Webuzo di host (bukan container), cache/queue/session = database (tanpa Redis)
+#   - jumlah thread FrankenPHP/Node dibatasi, dan pids_limit per container
+# HTTPS: Apache Webuzo reverse proxy ke 127.0.0.1:FE_PORT & APP_PORT -> lihat deploy/webuzo/
+#
+# Image dibangun GitHub Actions (ghcr.io); build di VPS berisiko menghabiskan batas thread.
+# Build lokal tetap bisa: docker compose build
 
 name: koleksi
 
-x-backend: &backend
-  image: koleksi-be:latest
-  env_file: ../.env
-  environment:
-    APP_URL: https://${API_DOMAIN}
-    FRONTEND_URL: https://${FE_DOMAIN}
-    FRONTEND_API_TOKEN: ${BACKEND_API_TOKEN}
-    DB_CONNECTION: mysql
-    DB_HOST: mysql
-    DB_PORT: 3306
-    DB_DATABASE: ${DB_DATABASE}
-    DB_USERNAME: ${DB_USERNAME}
-    DB_PASSWORD: ${DB_PASSWORD}
-    REDIS_CLIENT: phpredis
-    REDIS_HOST: redis
-    CACHE_STORE: redis
-    QUEUE_CONNECTION: redis
-    SESSION_DRIVER: redis
-  volumes:
-    - storage:/app/storage
-  depends_on:
-    mysql:
-      condition: service_healthy
-    redis:
-      condition: service_started
-  restart: unless-stopped
-
-# fe memanggil https://API_DOMAIN lewat web server di host (Apache/Caddy), bukan lewat internet:
-# NAT VPS belum tentu mendukung koneksi balik (hairpin) ke IP publiknya sendiri.
-x-api-host: &api-host
-  - "${API_DOMAIN}:${HOST_GATEWAY:-host-gateway}"
-
 services:
   app:
-    <<: *backend
+    image: ghcr.io/hijrstudio/koleksi-be:${IMAGE_TAG:-latest}
     build:
       context: ..
-    ports:
-      - "127.0.0.1:${APP_PORT:-8080}:8080"
-
-  worker:
-    <<: *backend
-    pull_policy: never
-    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
-    healthcheck:
-      disable: true
-
-  scheduler:
-    <<: *backend
-    pull_policy: never
-    command: ["php", "artisan", "schedule:work"]
-    healthcheck:
-      disable: true
+    network_mode: host
+    env_file: ../.env
+    environment:
+      APP_URL: https://${API_DOMAIN}
+      FRONTEND_URL: https://${FE_DOMAIN}
+      FRONTEND_API_TOKEN: ${BACKEND_API_TOKEN}
+      APP_BIND: 127.0.0.1
+      APP_PORT: ${APP_PORT:-8080}
+      PHP_THREADS: ${PHP_THREADS:-4}
+      DB_CONNECTION: mariadb
+      DB_HOST: ${DB_HOST:-127.0.0.1}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SESSION_DRIVER: database
+    volumes:
+      - storage:/app/storage
+    pids_limit: ${APP_PIDS_LIMIT:-96}
+    restart: unless-stopped
 
   fe:
-    image: koleksi-fe:latest
+    image: ghcr.io/hijrstudio/koleksi-fe:${IMAGE_TAG:-latest}
     build:
       context: ../../fe
       args:
         BACKEND_API_URL: https://${API_DOMAIN}/api/v1
         BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
+        IMAGES_ALLOW_LOCAL_IP: "true"   # API_DOMAIN -> 127.0.0.1 (extra_hosts), lihat fe/next.config.ts
       secrets:
         - backend_api_token
-      # Prerender ISR saat build memanggil API
-      extra_hosts: *api-host
+    network_mode: host
     environment:
+      HOSTNAME: 127.0.0.1
+      PORT: ${FE_PORT:-3000}
       BACKEND_API_URL: https://${API_DOMAIN}/api/v1
       BACKEND_STORAGE_URL: ${BACKEND_STORAGE_URL:-}
       BACKEND_API_TOKEN: ${BACKEND_API_TOKEN}
-    extra_hosts: *api-host
-    ports:
-      - "127.0.0.1:${FE_PORT:-3000}:3000"
+      # Hemat thread: thread pool libuv & V8 diperkecil
+      UV_THREADPOOL_SIZE: 2
+      NODE_OPTIONS: --v8-pool-size=2
+    # fe memanggil https://API_DOMAIN lewat web server di host ini, bukan lewat internet
+    # (NAT VPS belum tentu mendukung koneksi balik ke IP publiknya sendiri)
+    extra_hosts:
+      - "${API_DOMAIN}:127.0.0.1"
+    pids_limit: ${FE_PIDS_LIMIT:-64}
     depends_on:
       - app
-    restart: unless-stopped
-
-  mysql:
-    image: mysql:8.4
-    environment:
-      MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-    volumes:
-      - mysql:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis:/data
     restart: unless-stopped
 
 secrets:
@@ -113,5 +76,3 @@ secrets:
 
 volumes:
   storage:
-  mysql:
-  redis:

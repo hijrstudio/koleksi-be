@@ -1,11 +1,17 @@
-# Server internal di container app. TLS ditangani Caddy edge (deploy/Caddyfile).
+# Server internal di container app. TLS ditangani web server di depan (Apache Webuzo / Caddy edge).
+# Di VPS container memakai network host, jadi APP_BIND=127.0.0.1 supaya hanya bisa diakses dari server itu sendiri.
 {
-	frankenphp
+	frankenphp {
+		# VPS OpenVZ membatasi thread per VPS: jumlah worker PHP dibuat tetap & kecil
+		num_threads {$PHP_THREADS:4}
+		max_threads {$PHP_THREADS:4}
+	}
 	auto_https off
 	admin off
 }
 
-:8080 {
+:{$APP_PORT:8080} {
+	bind {$APP_BIND:0.0.0.0}
 	root * /app/public
 	encode zstd br gzip
 	php_server

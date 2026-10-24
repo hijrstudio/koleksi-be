@@ -1,13 +1,13 @@
-# Caddy edge: HTTPS otomatis (Let's Encrypt) untuk domain FE & API.
+# Caddy edge (alternatif Apache Webuzo): HTTPS otomatis (Let's Encrypt) untuk domain FE, API & CMS.
+# Aturan path api/cms sama dengan deploy/webuzo/*.conf.
 {
 	email {$ACME_EMAIL}
 }
 
 (security) {
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
 }
@@ -18,14 +18,29 @@ www.{$FE_DOMAIN} {
 
 {$FE_DOMAIN} {
 	import security
+	header Referrer-Policy "strict-origin-when-cross-origin"
 	encode zstd gzip
-	reverse_proxy fe:3000
+	reverse_proxy 127.0.0.1:{$FE_PORT}
 }
 
 {$API_DOMAIN} {
 	import security
-	request_body {
-		max_size 25MB
+	header X-Robots-Tag "noindex, nofollow"
+	@apiauth path /api/auth /api/auth/*
+	respond @apiauth 404
+	@notapi not path /api/* /storage/* /up
+	redir @notapi https://{$CMS_DOMAIN}{uri} 302
+	reverse_proxy 127.0.0.1:{$APP_PORT}
+}
+
+{$CMS_DOMAIN} {
+	import security
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		X-Robots-Tag "noindex, nofollow"
 	}
-	reverse_proxy app:8080
+	@api path /api /api/*
+	respond @api 404
+	reverse_proxy 127.0.0.1:{$APP_PORT}
 }

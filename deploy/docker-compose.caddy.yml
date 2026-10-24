@@ -4,14 +4,14 @@
 services:
   caddy:
     image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+    network_mode: host
     environment:
       FE_DOMAIN: ${FE_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
+      CMS_DOMAIN: ${CMS_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL}
+      FE_PORT: ${FE_PORT:-3000}
+      APP_PORT: ${APP_PORT:-8080}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
