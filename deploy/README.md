@@ -88,13 +88,16 @@ Nameserver masih di Wix (`ns4/ns5.wixdns.net`) selama transfer domain ke Jagoan 
 | A | `@` | `101.50.1.14` | |
 | A | `api` | `101.50.1.14` | |
 | A | `cms` | `101.50.1.14` | |
+| A | `www` | `101.50.1.14` | |
 | A | `mail` | `152.44.45.11` | |
-| CNAME | `www` | `koleksi.club` | |
 | MX | `@` | `mx.zoho.com` | 10 |
 | MX | `@` | `mx2.zoho.com` | 20 |
 | MX | `@` | `mx3.zoho.com` | 50 |
 | TXT | `@` | `v=spf1 include:zohomail.com ~all` | |
 | TXT | `@` | `zoho-verification=zb13674199.zmverify.zoho.com` | |
+
+`www` **harus A record**, bukan CNAME: Automatic SSL Webuzo melewatkan `www` yang berupa CNAME, sehingga
+sertifikat tanpa `www` dan `https://www.koleksi.club` error `ERR_CERT_COMMON_NAME_INVALID`.
 
 **Begitu transfer selesai:** buat ulang semua record di atas di DNS baru, **lalu** ganti nameserver.
 Wix menghapus zona DNS domain yang pindah, jadi website **dan email Zoho** mati kalau ini dilewati.
@@ -118,8 +121,23 @@ Biarkan terminal itu terbuka, lalu di browser (abaikan peringatan sertifikat):
    Tambah user `koleksi` dengan domain utama `koleksi.club`.
 2. **User panel** `https://localhost:2003`, login user tadi.
    Tambah subdomain `api.koleksi.club` dan `cms.koleksi.club`.
-3. Pasang SSL **Let's Encrypt** untuk `koleksi.club` **+ `www.koleksi.club`**, `api.koleksi.club`, dan `cms.koleksi.club`
+3. Pasang SSL **Let's Encrypt** lewat **SSL → Automatic SSL** (bukan *Install Certificate*, itu untuk tempel manual)
+   untuk `koleksi.club`, `api.koleksi.club`, dan `cms.koleksi.club`
    ([panduan Jagoan](https://www.jagoanhosting.com/tutorial/vps-hosting/cara-install-ssl-domain-pada-layanan-vps-hosting)).
+
+   **Wajib sebelumnya**, agar `www` ikut masuk sertifikat:
+   ```bash
+   echo "127.0.0.1 koleksi.club www.koleksi.club" | sudo tee -a /etc/hosts
+   ```
+   Sebelum meminta sertifikat, Webuzo menguji tiap alias dengan membuka `http://<alias>/.well-known/...` **dari
+   VPS sendiri**. VPS NAT tidak bisa menjangkau IP publiknya sendiri, jadi tanpa baris di atas tes timeout dan
+   alias dibuang (log: `Failed to verify alias : www.koleksi.club`, sertifikat hanya `koleksi.club`).
+   `/etc/hosts` permanen (selamat dari restart), jadi perpanjangan otomatis tetap menyertakan `www`.
+   Juga pastikan `www` berupa **A record** di DNS publik dan di zona DNS Webuzo (Domain → DNS Zone).
+   `Failed to verify alias : mail.koleksi.club` itu normal (DNS `mail` ke server lain).
+
+   Mengganti sertifikat: centang domain → **Revoke** → **Install** → `sudo systemctl restart httpd`.
+   Setelah *Revoke*, domain memakai sertifikat self-signed Webuzo (website error) sampai *Install* selesai.
    Perpanjangan otomatis oleh cron Webuzo (`/etc/cron.d/lets_encrypt`), jangan dihapus.
 4. **Database** (user panel → Databases): buat database + user MariaDB, beri user itu **semua hak akses** ke
    database tersebut. Webuzo menambahkan prefix nama user panel (mis. `koleksi_web`). Catat nama database,
