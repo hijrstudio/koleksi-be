@@ -95,6 +95,10 @@ Nameserver masih di Wix (`ns4/ns5.wixdns.net`) selama transfer domain ke Jagoan 
 | MX | `@` | `mx3.zoho.com` | 50 |
 | TXT | `@` | `v=spf1 include:zohomail.com ~all` | |
 | TXT | `@` | `zoho-verification=zb13674199.zmverify.zoho.com` | |
+| TXT | `@` | `brevo-code:899f12e0cb8ef8444b4eb51301ad738e` (Brevo) | |
+| CNAME | `brevo1._domainkey` | `b1.koleksi-club.dkim.brevo.com` (DKIM Brevo) | |
+| CNAME | `brevo2._domainkey` | `b2.koleksi-club.dkim.brevo.com` (DKIM Brevo) | |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` | |
 
 `www` **harus A record**, bukan CNAME: Automatic SSL Webuzo melewatkan `www` yang berupa CNAME, sehingga
 sertifikat tanpa `www` dan `https://www.koleksi.club` error `ERR_CERT_COMMON_NAME_INVALID`.
@@ -169,6 +173,33 @@ chmod 600 .env
   dibuat; kalau DB dipindah dari Laravel Cloud, ganti password superadmin lewat CMS.
 - `YODU_*`: sandbox dulu; ganti ke kredensial live (`YODU_BASE_URL=https://yodupay-api.yodu.id`, key lewat
   `YODU_PRIVATE_KEY` base64) setelah tes pembayaran di server lolos. Jangan commit key.
+
+### E-mail aplikasi (Brevo)
+
+VPS Hosting **memblokir SMTP keluar** (port 25/465/587, termasuk Gmail & Zoho; dikonfirmasi CS Jagoan), jadi
+e-mail aplikasi (verifikasi pendaftaran, approval, pengingat perpanjangan, ganti password) dikirim lewat
+**Brevo** (gratis 300 e-mail/hari) di port **2525** yang terbuka. Mailbox manusia (`@koleksi.club`) tetap di Zoho.
+
+`be/.env`:
+```
+MAIL_MAILER=smtp
+MAIL_HOST=smtp-relay.brevo.com
+MAIL_PORT=2525
+MAIL_USERNAME=<login SMTP Brevo, xxxx@smtp-brevo.com>
+MAIL_PASSWORD=<SMTP key Brevo>
+MAIL_FROM_ADDRESS=noreply@koleksi.club
+MAIL_FROM_NAME="KOLEKSI"
+```
+
+- **SMTP key `koleksi-vps-production` kedaluwarsa 25 Okt 2027** (juga setelah 90 hari tidak dipakai). Buat key baru
+  sebelum tanggal itu (Brevo → Settings → SMTP & API), isi `MAIL_PASSWORD`, lalu
+  `docker compose up -d --no-deps --force-recreate app`. Key kedaluwarsa = e-mail berhenti tanpa peringatan.
+- Domain `koleksi.club` diautentikasi di Brevo lewat record `brevo-code`, DKIM `brevo1/2._domainkey`, dan `_dmarc`
+  (lihat tabel DNS). SPF Zoho tidak diubah. Saat pindah DNS, record ini **wajib ikut dibuat ulang**.
+- Ganti ke SMTP mailbox domain sendiri hanya bisa kalau port-nya tidak diblokir dari VPS (cek dulu dengan
+  `curl -v telnet://<host>:<port>`); cukup ganti `MAIL_*`, tanpa ubah kode.
+- E-mail yang gagal (mis. saat SMTP bermasalah) tersimpan di `failed_jobs`: kirim ulang dengan
+  `docker compose exec app php artisan queue:retry all`.
 
 ## 5. GitHub: image & secrets
 
