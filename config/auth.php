@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Member;
 use App\Models\User;
 
 return [
@@ -67,6 +68,12 @@ return [
             'model' => env('AUTH_MODEL', User::class),
         ],
 
+        // Member website (token Sanctum). Dipakai password broker `members` (lupa kata sandi).
+        'members' => [
+            'driver' => 'eloquent',
+            'model' => Member::class,
+        ],
+
         // 'users' => [
         //     'driver' => 'database',
         //     'table' => 'users',
@@ -97,6 +104,15 @@ return [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        // Lupa kata sandi member (FE /lupa-password). expire = masa berlaku link (menit),
+        // throttle = jeda minimal antar permintaan link untuk e-mail yang sama (detik).
+        'members' => [
+            'provider' => 'members',
+            'table' => 'member_password_reset_tokens',
+            'expire' => (int) env('MEMBER_PASSWORD_RESET_TTL', 60),
             'throttle' => 60,
         ],
     ],

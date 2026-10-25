@@ -55,6 +55,14 @@ Schedule::command('sanctum:prune-expired --hours=24')
     ->onOneServer();
 
 /*
+| Token "lupa kata sandi" member yang sudah kedaluwarsa — hapus dari member_password_reset_tokens.
+*/
+Schedule::command('auth:clear-resets members')
+    ->dailyAt('03:05')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+/*
 | Pembayaran iuran QRIS — jaring pengaman kalau callback gateway tidak sampai & member menutup halaman.
 */
 Schedule::command('payments:reconcile')

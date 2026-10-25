@@ -41,10 +41,37 @@ class UpdateMemberPasswordRequest extends FormRequest
     {
         return [
             'current_password' => ['required', 'string', 'max:255'],
-            'password' => [
-                'required', 'string', 'confirmed', 'max:'.self::MAX_LENGTH,
-                Password::min(self::MIN_LENGTH)->mixedCase()->numbers()->uncompromised(),
-            ],
+            'password' => self::newPasswordRules(),
+        ];
+    }
+
+    /**
+     * Aturan kata sandi baru member — dipakai juga oleh ResetMemberPasswordRequest (lupa kata sandi),
+     * dan sama dengan FE (lib/auth/password.ts).
+     *
+     * @return list<mixed>
+     */
+    public static function newPasswordRules(): array
+    {
+        return [
+            'required', 'string', 'confirmed', 'max:'.self::MAX_LENGTH,
+            Password::min(self::MIN_LENGTH)->mixedCase()->numbers()->uncompromised(),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function newPasswordMessages(): array
+    {
+        return [
+            'password.required' => 'Kata sandi baru wajib diisi.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
+            'password.max' => 'Kata sandi maksimal '.self::MAX_LENGTH.' karakter.',
+            'password.min' => 'Kata sandi minimal '.self::MIN_LENGTH.' karakter.',
+            'password.mixed' => 'Kata sandi harus mengandung huruf besar dan huruf kecil.',
+            'password.numbers' => 'Kata sandi harus mengandung angka.',
+            'password.uncompromised' => 'Kata sandi ini pernah bocor di internet. Gunakan kata sandi lain.',
         ];
     }
 
@@ -91,13 +118,7 @@ class UpdateMemberPasswordRequest extends FormRequest
     {
         return [
             'current_password.required' => 'Kata sandi saat ini wajib diisi.',
-            'password.required' => 'Kata sandi baru wajib diisi.',
-            'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
-            'password.max' => 'Kata sandi maksimal '.self::MAX_LENGTH.' karakter.',
-            'password.min' => 'Kata sandi minimal '.self::MIN_LENGTH.' karakter.',
-            'password.mixed' => 'Kata sandi harus mengandung huruf besar dan huruf kecil.',
-            'password.numbers' => 'Kata sandi harus mengandung angka.',
-            'password.uncompromised' => 'Kata sandi ini pernah bocor di internet. Gunakan kata sandi lain.',
+            ...self::newPasswordMessages(),
         ];
     }
 

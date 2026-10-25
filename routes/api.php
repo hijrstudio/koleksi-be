@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\LatestNewsController;
 use App\Http\Controllers\Api\Member\AuthController as MemberAuthController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
+use App\Http\Controllers\Api\Member\PasswordResetController as MemberPasswordResetController;
 use App\Http\Controllers\Api\Member\ProfileController as MemberProfileController;
 use App\Http\Controllers\Api\MemberRegistrationController;
 use App\Http\Controllers\Api\NewsController;
@@ -94,6 +95,7 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
         Route::get('/', 'index')->name('index');
         Route::get('/categories', 'categories')->name('categories');
     });
+
 });
 
 /*
@@ -118,6 +120,14 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
     Route::post('/login', [MemberAuthController::class, 'login'])
         ->middleware(['frontend.token', 'throttle:20,1'])
         ->name('login');
+
+    // Lupa kata sandi (belum login): minta link → cek link → simpan kata sandi baru
+    Route::prefix('password')->name('password.')->controller(MemberPasswordResetController::class)
+        ->middleware(['frontend.token', 'throttle:member-password-reset'])->group(function () {
+            Route::post('/forgot', 'forgot')->name('forgot');
+            Route::post('/reset/check', 'check')->name('reset.check');
+            Route::post('/reset', 'reset')->name('reset');
+        });
 
     Route::middleware(['auth:sanctum', 'member', 'throttle:120,1'])->group(function () {
         Route::get('/me', [MemberAuthController::class, 'me'])->name('me');

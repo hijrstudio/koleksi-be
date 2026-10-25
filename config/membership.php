@@ -34,6 +34,12 @@ return [
     'token_ttl_days' => (int) env('MEMBER_TOKEN_TTL_DAYS', 30),
 
     /*
+    | Halaman FE "atur ulang kata sandi" — tombol di e-mail lupa kata sandi mengarah ke sini
+    | (?token=…&email=…). Masa berlaku link: config/auth.php → passwords.members.expire.
+    */
+    'password_reset_url' => env('MEMBER_PASSWORD_RESET_URL', env('FRONTEND_URL', 'http://localhost:3000').'/lupa-password/atur-ulang'),
+
+    /*
     | Pendaftaran member baru lewat website (form /daftar di FE):
     |   daftar → verifikasi e-mail → review pengurus di CMS → disetujui → bayar iuran pertama (QRIS) → aktif.
     */

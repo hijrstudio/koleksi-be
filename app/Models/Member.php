@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetMemberPassword;
 use Database\Factories\MemberFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -80,6 +81,15 @@ class Member extends Authenticatable
             'reviewed_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Link "lupa kata sandi" ke halaman FE (bawaan Laravel mengarah ke route `password.reset` milik web).
+     * Dipanggil password broker `members` (Api\Member\PasswordResetController).
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new ResetMemberPassword($token));
     }
 
     /** URL foto profil; avatar default kalau member belum upload foto. */

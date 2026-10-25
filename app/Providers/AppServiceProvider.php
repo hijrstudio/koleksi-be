@@ -72,6 +72,11 @@ class AppServiceProvider extends ServiceProvider
         ]);
         RateLimiter::for('member-registration-resend', fn (Request $request) => Limit::perHour(10)
             ->by('member-registration-resend:'.$request->ip()));
+        // Lupa kata sandi (publik, per IP pengunjung yang diteruskan FE). Batas per e-mail ada di controller.
+        RateLimiter::for('member-password-reset', fn (Request $request) => [
+            Limit::perMinute(10)->by('member-password-reset:m:'.$request->ip()),
+            Limit::perHour(30)->by('member-password-reset:h:'.$request->ip()),
+        ]);
         // Callback gateway (publik): per IP pengirim
         RateLimiter::for('payment-callback', fn (Request $request) => Limit::perMinute(120)->by('payment-callback:'.$request->ip()));
     }
