@@ -18,7 +18,8 @@ set -a; . ./.env; set +a
 
 docker compose pull app fe
 # </dev/null: `compose run` membaca stdin & bisa menelan sisa skrip
-docker compose run --rm -T app php artisan migrate --force </dev/null
+#   RoleSeeder idempoten (findOrCreate): permission modul CMS baru ikut terdaftar
+docker compose run --rm -T app sh -c 'php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force' </dev/null
 docker compose up -d --remove-orphans </dev/null
 
 # `compose up` tidak selalu mendeteksi tag :latest yang berubah: ganti container yang image-nya tertinggal

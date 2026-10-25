@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\EvGarageController;
 use App\Http\Controllers\Api\GalleryAlbumController;
 use App\Http\Controllers\Api\GuideArticleController;
 use App\Http\Controllers\Api\GuideInfographicController;
+use App\Http\Controllers\Api\GuidePlaybookController;
 use App\Http\Controllers\Api\GuideVideoController;
 use App\Http\Controllers\Api\HeroBannerController;
 use App\Http\Controllers\Api\LatestEventController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\Member\AuthController as MemberAuthController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
 use App\Http\Controllers\Api\Member\PasswordResetController as MemberPasswordResetController;
+use App\Http\Controllers\Api\Member\PlaybookController as MemberPlaybookController;
 use App\Http\Controllers\Api\Member\ProfileController as MemberProfileController;
 use App\Http\Controllers\Api\MemberRegistrationController;
 use App\Http\Controllers\Api\NewsController;
@@ -96,6 +98,11 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
         Route::get('/categories', 'categories')->name('categories');
     });
 
+    // Web Playbook: list + isi PDF untuk dibaca (unduh hanya member, lihat grup v1/member)
+    Route::prefix('guides/playbooks')->name('api.v1.guides.playbooks.')->controller(GuidePlaybookController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{playbook}/file', 'file')->whereNumber('playbook')->name('file');
+    });
 });
 
 /*
@@ -136,6 +143,9 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
         Route::get('/profile', [MemberProfileController::class, 'show'])->name('profile.show');
         Route::post('/profile', [MemberProfileController::class, 'update'])->name('profile.update'); // multipart (dokumen)
         Route::put('/password', [MemberPasswordController::class, 'update'])->middleware('throttle:member-password')->name('password.update');
+
+        Route::get('/playbooks/{playbook}/download', [MemberPlaybookController::class, 'download'])
+            ->whereNumber('playbook')->name('playbooks.download');
 
         // Bayar iuran (QRIS). Sengaja tanpa syarat "member aktif" — member nonaktif justru yang perlu bayar.
         Route::post('/payments/iuran', [IuranPaymentController::class, 'store'])
