@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\LatestGuideController;
 use App\Http\Controllers\Api\LatestNewsController;
 use App\Http\Controllers\Api\Member\AuthController as MemberAuthController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
+use App\Http\Controllers\Api\Member\NotificationController as MemberNotificationController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
 use App\Http\Controllers\Api\Member\PasswordResetController as MemberPasswordResetController;
 use App\Http\Controllers\Api\Member\PlaybookController as MemberPlaybookController;
@@ -143,6 +144,10 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
         Route::get('/profile', [MemberProfileController::class, 'show'])->name('profile.show');
         Route::post('/profile', [MemberProfileController::class, 'update'])->name('profile.update'); // multipart (dokumen)
         Route::put('/password', [MemberPasswordController::class, 'update'])->middleware('throttle:member-password')->name('password.update');
+
+        // Lonceng notifikasi di website
+        Route::get('/notifications', [MemberNotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/read', [MemberNotificationController::class, 'markAsRead'])->name('notifications.read');
 
         Route::get('/playbooks/{playbook}/download', [MemberPlaybookController::class, 'download'])
             ->whereNumber('playbook')->name('playbooks.download');
