@@ -19,6 +19,7 @@ use App\Http\Controllers\Cms\NewsController;
 use App\Http\Controllers\Cms\NotificationController;
 use App\Http\Controllers\Cms\PartnerController;
 use App\Http\Controllers\Cms\SpkluOperatorController;
+use App\Http\Controllers\Cms\SponsorController;
 use App\Http\Controllers\Cms\VehicleBrandController;
 use App\Http\Controllers\Cms\VehicleModelController;
 use App\Http\Controllers\LocaleController;
@@ -77,6 +78,9 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
 
     // partner
     Route::resource('partners', PartnerController::class)->except('show');
+
+    // sponsor (skema & alur sama dengan partner)
+    Route::resource('sponsors', SponsorController::class)->except('show');
 
     // spklu (operator / brand + aplikasi)
     Route::resource('spklu-operators', SpkluOperatorController::class)->except('show');

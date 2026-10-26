@@ -29,6 +29,7 @@ class RoleSeeder extends Seeder
         'event-categories' => ['view', 'create', 'update', 'delete'],
         'events' => ['view', 'create', 'update', 'delete'],
         'partners' => ['view', 'create', 'update', 'delete'],
+        'sponsors' => ['view', 'create', 'update', 'delete'],
         'spklu-operators' => ['view', 'create', 'update', 'delete'],
         'vehicle-brands' => ['view', 'create', 'update', 'delete'],
         'vehicle-models' => ['view', 'create', 'update', 'delete'],

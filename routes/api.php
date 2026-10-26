@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\SpkluOperatorController;
+use App\Http\Controllers\Api\SponsorController;
 use App\Http\Controllers\Api\VehicleBrandController;
 use App\Http\Controllers\Api\Webhook\FakePaymentController;
 use App\Http\Controllers\Api\Webhook\YoduCallbackController;
@@ -55,6 +56,7 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
     // /events/latest & /events/categories didaftarkan lebih dulu, jadi tidak tertangkap sebagai {slug}
     Route::get('/events/{slug}', [EventController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('api.v1.events.show');
     Route::get('/partners', [PartnerController::class, 'index'])->name('api.v1.partners.index');
+    Route::get('/sponsors', [SponsorController::class, 'index'])->name('api.v1.sponsors.index');
     Route::get('/about', AboutController::class)->name('api.v1.about');
 
     Route::prefix('ev-garage')->name('api.v1.ev-garage.')->controller(EvGarageController::class)->group(function () {

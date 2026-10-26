@@ -91,6 +91,13 @@ class MenuHelper
                 'can' => 'partners.view',
             ],
             [
+                'icon' => 'sponsor',
+                'name' => 'Sponsor',
+                'path' => '/sponsors',
+                'match' => '/sponsors',
+                'can' => 'sponsors.view',
+            ],
+            [
                 'icon' => 'spklu',
                 'name' => 'SPKLU',
                 'path' => '/spklu-operators',
@@ -265,6 +272,8 @@ class MenuHelper
             'spklu' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.75 20.25V5.75C4.75 4.64543 5.64543 3.75 6.75 3.75H11.25C12.3546 3.75 13.25 4.64543 13.25 5.75V20.25M3.75 20.25H14.25M13.25 9.75H15.25C16.0784 9.75 16.75 10.4216 16.75 11.25V15.5C16.75 16.1904 17.3096 16.75 18 16.75C18.6904 16.75 19.25 16.1904 19.25 15.5V8.25L17.25 6.25M9.75 7.75L7.75 11H10.25L8.25 14.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 
             'partner' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.75 11.25L7.25 7.75L10.5 9.25L13.25 7.5C13.95 7.05 14.85 7.07 15.53 7.55L20.25 10.75M3.75 11.25L9.25 16.75C9.8 17.3 10.7 17.3 11.25 16.75M3.75 11.25L2.75 10.25M20.25 10.75L14.25 16.75C13.7 17.3 12.8 17.3 12.25 16.75L11.25 15.75M20.25 10.75L21.25 9.75M11.25 16.75L12.25 17.75M10 12.5L12.75 10.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+
+            'sponsor' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9.25" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M12 6.75L12.73 8.23L14.36 8.47L13.18 9.62L13.46 11.25L12 10.48L10.54 11.25L10.82 9.62L9.64 8.47L11.27 8.23L12 6.75Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8.75 13.75L7.25 20.25L12 18L16.75 20.25L15.25 13.75" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
 
             'news' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.75 19.25H6.25C5.14543 19.25 4.25 18.3546 4.25 17.25V6.25C4.25 5.42157 4.92157 4.75 5.75 4.75H15.25C16.0784 4.75 16.75 5.42157 16.75 6.25V19.25ZM16.75 19.25C17.8546 19.25 18.75 18.3546 18.75 17.25V9.75H16.75" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.75 8.75H13.25M7.75 12H13.25M7.75 15.25H10.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
 
