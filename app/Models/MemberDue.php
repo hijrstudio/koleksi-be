@@ -21,6 +21,9 @@ class MemberDue extends Model
     /** Status yang dianggap "lunas" untuk perhitungan keaktifan. */
     public const SETTLED = [self::PAID, self::WAIVED];
 
+    /** payment_method tagihan yang dibebaskan karena pemutihan tunggakan (lihat config membership.arrears_cutoff_year). */
+    public const METHOD_AMNESTY = 'amnesty';
+
     protected $fillable = [
         'invoice_number', 'member_id', 'period_label', 'period_start', 'period_end', 'amount', 'status',
         'payment_method', 'paid_at', 'recorded_by', 'notes',
@@ -54,6 +57,11 @@ class MemberDue extends Model
     public function isSettled(): bool
     {
         return in_array($this->status, self::SETTLED, true);
+    }
+
+    public function isAmnesty(): bool
+    {
+        return $this->status === self::WAIVED && $this->payment_method === self::METHOD_AMNESTY;
     }
 
     // Fase 2: relasi payments() & openPayment() ditambahkan bersama payment gateway.

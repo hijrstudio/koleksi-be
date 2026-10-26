@@ -17,6 +17,14 @@ return [
     'annual_fee' => (int) env('MEMBERSHIP_ANNUAL_FEE', 0),
 
     /*
+    | Pemutihan tunggakan (keputusan pengurus, Okt 2026): periode keanggotaan yang dimulai SEBELUM tahun ini
+    | tidak pernah ditagih lagi — yang ditagih mulai periode "2026-2027" tiap member. Tunggakan lama dicatat
+    | resmi sebagai "dibebaskan (pemutihan)" lewat `php artisan members:waive-arrears`.
+    | Kosongkan (MEMBERSHIP_ARREARS_CUTOFF_YEAR=) untuk menagih semua tunggakan lagi.
+    */
+    'arrears_cutoff_year' => env('MEMBERSHIP_ARREARS_CUTOFF_YEAR', 2026) ? (int) env('MEMBERSHIP_ARREARS_CUTOFF_YEAR', 2026) : null,
+
+    /*
     | Pengingat daftar ulang dikirim H-x sebelum jatuh tempo (0 = pada hari jatuh tempo).
     | Kalau scheduler sempat tidak jalan, hanya tahap paling mendesak yang dikirim.
     */

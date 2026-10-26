@@ -114,7 +114,10 @@ class MemberController extends Controller
         $member->load([
             'vehicles.brand:id,name',
             'vehicles.vehicleModel:id,name',
-            'dues' => fn ($q) => $q->with('recorder:id,name')->orderByDesc('period_start'),
+            // Riwayat iuran mulai tahun pemutihan (mis. 2026-2027); periode sebelumnya tidak ditampilkan
+            'dues' => fn ($q) => $q->with('recorder:id,name')
+                ->when($membership->arrearsCutoffYear(), fn ($q, int $year) => $q->whereYear('period_start', '>=', $year))
+                ->orderByDesc('period_start'),
             'statusLogs' => fn ($q) => $q->with('changer:id,name')->latest('id')->limit(20),
             'renewalReminders' => fn ($q) => $q->latest('sent_at')->limit(20),
         ]);

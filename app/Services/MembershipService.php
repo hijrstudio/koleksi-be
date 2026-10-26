@@ -104,6 +104,56 @@ class MembershipService
         });
     }
 
+    /** Tahun pemutihan: periode yang dimulai sebelum tahun ini tidak ditagih (null = semua tunggakan ditagih). */
+    public function arrearsCutoffYear(): ?int
+    {
+        return config('membership.arrears_cutoff_year');
+    }
+
+    /**
+     * Pemutihan: setiap periode member yang dimulai sebelum $beforeYear dan belum lunas — termasuk periode yang
+     * belum punya tagihan (sel kosong di Excel) — dicatat "dibebaskan (pemutihan)", lalu status dihitung ulang
+     * sekali. Periode yang sudah lunas/dibebaskan tidak disentuh, jadi aman dijalankan berulang.
+     *
+     * @return int jumlah periode yang diputihkan
+     */
+    public function waiveArrears(Member $member, int $beforeYear, ?User $admin = null): int
+    {
+        $anchor = $member->membershipAnchor();
+        if ($anchor->year >= $beforeYear) {
+            return 0;
+        }
+
+        $label = $beforeYear.'-'.($beforeYear + 1);
+
+        return DB::transaction(function () use ($member, $anchor, $beforeYear, $admin, $label) {
+            $count = 0;
+
+            for ($term = $this->termForYear($member, $anchor->year); $term->start->year < $beforeYear; $term = $term->next($anchor)) {
+                $due = $this->invoiceFor($member, $term);
+                if ($due->isSettled()) {
+                    continue;
+                }
+
+                $due->update([
+                    'status' => MemberDue::WAIVED,
+                    'payment_method' => MemberDue::METHOD_AMNESTY,
+                    'amount' => 0,
+                    'recorded_by' => $admin?->id,
+                    'paid_at' => now(),
+                    'notes' => "Pemutihan tunggakan sebelum periode {$label}",
+                ]);
+                $count++;
+            }
+
+            if ($count > 0) {
+                $this->refreshStatus($member, null, $admin, "Pemutihan tunggakan sebelum periode {$label}");
+            }
+
+            return $count;
+        });
+    }
+
     /** Akhir periode lunas terakhir. */
     public function computePaidUntil(Member $member): ?Carbon
     {

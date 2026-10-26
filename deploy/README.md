@@ -288,6 +288,21 @@ docker stats --no-stream                                                     # k
 sudo tail -f /usr/local/apps/apache2/logs/error_log      # error reverse proxy (502/503 = container mati)
 ```
 
+### Pemutihan tunggakan iuran
+
+Kebijakan pengurus (Okt 2026): tunggakan sebelum periode 2026-2027 diputihkan; yang ditagih mulai periode 2026-2027
+tiap member (`MEMBERSHIP_ARREARS_CUTOFF_YEAR`, default 2026). Penagihan sudah mengikuti aturan ini otomatis; perintah
+di bawah **mencatatnya resmi** di database dan menghitung ulang status member. Riwayat Iuran di CMS hanya menampilkan
+periode mulai 2026-2027, jadi periode yang diputihkan tidak terlihat.
+Aman dijalankan ulang. Jalankan lagi setelah import Excel yang menambah tagihan lama.
+
+```bash
+docker compose exec app php artisan members:waive-arrears --dry-run   # lihat dampaknya dulu
+docker compose exec app php artisan members:waive-arrears             # jalankan
+```
+
+Member yang sedang punya QRIS pending dilewati (QR-nya masih memuat nominal lama) — jalankan ulang ±15 menit kemudian.
+
 ## Tes di laptop (localhost)
 
 Image yang sama dengan produksi, dibuka lewat `localhost` (tanpa domain, Apache, atau HTTPS).

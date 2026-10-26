@@ -99,6 +99,24 @@ test('member detail page is displayed', function () {
         ->assertOk()->assertSee('Arwani Hidayat')->assertSee('Riwayat Iuran');
 });
 
+test('dues history only shows periods from the arrears cutoff year onwards', function () {
+    config(['membership.arrears_cutoff_year' => 2026]);
+    $member = Member::factory()->create(['tgl_bergabung' => '2024-08-01']);
+    $membership = app(MembershipService::class);
+    $membership->invoiceFor($member, $membership->termForYear($member, 2026));
+    $membership->waiveArrears($member, 2026);   // 2024-2025 & 2025-2026 diputihkan
+
+    $this->actingAs($this->admin)->get(route('members.show', $member))
+        ->assertOk()
+        ->assertSee('IUR-2627-')
+        ->assertDontSee('IUR-2425-')
+        ->assertDontSee('IUR-2526-');
+
+    // Tanpa pemutihan → seluruh riwayat tampil
+    config(['membership.arrears_cutoff_year' => null]);
+    $this->actingAs($this->admin)->get(route('members.show', $member))->assertSee('IUR-2425-');
+});
+
 test('admin can set status manually and it survives automatic refresh', function () {
     $member = Member::factory()->create();
     $service = app(MembershipService::class);

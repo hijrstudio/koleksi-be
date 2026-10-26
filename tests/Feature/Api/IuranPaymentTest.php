@@ -19,7 +19,8 @@ uses(RefreshDatabase::class);
 const FEE = 150000;
 
 beforeEach(function () {
-    config(['yodu.driver' => 'fake', 'membership.annual_fee' => FEE, 'membership.grace_days' => 30]);
+    // Tanpa pemutihan: menguji penagihan tunggakan umum (pemutihan diuji di MemberArrearsAmnestyTest)
+    config(['yodu.driver' => 'fake', 'membership.annual_fee' => FEE, 'membership.grace_days' => 30, 'membership.arrears_cutoff_year' => null]);
     $this->travelTo(Carbon::parse('2026-10-12 10:00:00'));
     $this->membership = app(MembershipService::class);
 });

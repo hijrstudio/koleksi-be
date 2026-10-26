@@ -17,8 +17,10 @@ use Illuminate\Support\Collection;
  * Aturan (mengikuti kartu iuran yang sudah berjalan):
  *  - tagihan hanya muncul kalau jatuh tempo ≤ jendela pengingat (membership.reminder_days, default 30 hari),
  *    sedang masa tenggang, sudah tidak aktif, atau belum pernah bayar;
- *  - yang ditagih: semua tagihan belum lunas s/d periode berjalan (TUNGGAKAN IKUT DITAGIH)
+ *  - yang ditagih: semua tagihan belum lunas s/d periode berjalan (tunggakan ikut ditagih)
  *    + periode daftar ulang berikutnya;
+ *  - KECUALI periode sebelum tahun pemutihan (membership.arrears_cutoff_year): tidak pernah ditagih,
+ *    walau pemutihannya belum dicatat (members:waive-arrears);
  *  - status aktif yang ditetapkan manual oleh pengurus → tidak ada tagihan.
  *
  * Nominal tagihan yang dibuat sebelum iuran tahunan diatur (amount = 0) memakai iuran tahunan saat ini.
@@ -111,6 +113,7 @@ class BillingResolver
      *  2. SETIAP periode dari periode daftar ulang s/d periode berjalan — invoice-nya sudah ada atau belum —
      *     supaya setelah dibayar paid_until benar-benar menutup hari ini dan member aktif kembali;
      *     kalau jatuh tempo masih di depan (due_soon), cukup periode daftar ulang itu sendiri.
+     * Periode yang dimulai sebelum tahun pemutihan dilewati; daftar ulang paling awal = periode tahun pemutihan.
      *
      * @return Collection<int, array{due: MemberDue|null, term: MembershipTerm, amount: int}>
      */
@@ -119,6 +122,10 @@ class BillingResolver
         $fee = (int) config('membership.annual_fee');
         $anchor = $member->membershipAnchor();
         $renewal = $this->membership->renewalTerm($member, $date);
+        $cutoff = $this->membership->arrearsCutoffYear();
+        if ($cutoff !== null && $renewal->start->year < $cutoff) {
+            $renewal = MembershipTerm::forYear($anchor, max($cutoff, $anchor->year));
+        }
         $last = MembershipTerm::containing($anchor, $date);
         if ($last->start->lt($renewal->start)) {
             $last = $renewal;
@@ -134,7 +141,9 @@ class BillingResolver
 
         // 1. Tunggakan lama sebelum periode daftar ulang
         $lines = $dues
-            ->filter(fn (MemberDue $d) => $d->status === MemberDue::UNPAID && $d->period_start->lt($renewal->start))
+            ->filter(fn (MemberDue $d) => $d->status === MemberDue::UNPAID
+                && $d->period_start->lt($renewal->start)
+                && ($cutoff === null || $d->period_start->year >= $cutoff))
             ->map(fn (MemberDue $d) => [
                 'due' => $d,
                 'term' => MembershipTerm::forYear($anchor, $d->period_start->year),
