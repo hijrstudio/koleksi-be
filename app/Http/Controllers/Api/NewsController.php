@@ -19,12 +19,13 @@ class NewsController extends Controller
     private const RELATED_LIMIT = 3;
 
     private const CARD_COLUMNS = [
-        'id', 'category', 'title', 'slug', 'image',
+        'id', 'category', 'title', 'summary', 'slug', 'image',
         'author_member_id', 'author_user_id', 'published_at', 'created_at',
+        'source_url', 'source_name', 'source_author', 'source_published_on', // Berita EV (media lain)
     ];
 
     /**
-     * List berita: pencarian (judul ID/EN & nama penulis), filter kategori, urut terbaru/terlama.
+     * List berita: pencarian (judul ID/EN, nama penulis & media), filter kategori, urut terbaru/terlama.
      * Paginasi bernomor: COUNT + berita + 2 eager load penulis = maks. 4 query.
      */
     public function index(NewsIndexRequest $request): JsonResponse
@@ -42,11 +43,12 @@ class NewsController extends Controller
                     JsonSearch::orWhereLike($q, ['title->id', 'title->en'], $search);
 
                     $q->orWhereHas('authorMember', fn (Builder $m) => $m->where('nama_lengkap', 'like', $like))
-                        ->orWhereHas('authorUser', fn (Builder $u) => $u->where('name', 'like', $like));
+                        ->orWhereHas('authorUser', fn (Builder $u) => $u->where('name', 'like', $like))
+                        ->orWhere('source_name', 'like', $like)
+                        ->orWhere('source_author', 'like', $like);
                 });
             })
-            ->orderBy('published_at', $direction)
-            ->orderBy('id', $direction)
+            ->orderByNewsDate($direction)
             ->paginate($request->perPage());
 
         return response()->json([
@@ -73,8 +75,7 @@ class NewsController extends Controller
         $related = $this->cardQuery()
             ->where('category', $news->category)
             ->whereKeyNot($news->id)
-            ->latest('published_at')
-            ->latest('id')
+            ->orderByNewsDate()
             ->limit(self::RELATED_LIMIT)
             ->get();
 

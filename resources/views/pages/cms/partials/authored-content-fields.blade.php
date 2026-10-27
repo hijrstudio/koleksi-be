@@ -9,6 +9,9 @@
       $selectedMember          ['id' => .., 'label' => ..] | null
       $noun                    sebutan konten, mis. "artikel" / "berita"
       $slugPlaceholder         contoh slug
+      $afterTitle              (opsional) view yang disisipkan setelah judul, mis. field khusus kategori
+      $hideWhen                (opsional) ekspresi Alpine; true = field konten & penulis disembunyikan
+                               (mis. Berita EV yang hanya berupa link ke media lain)
 --}}
 @php
     use App\Http\Requests\Cms\AuthoredContentRequest as Limits;
@@ -33,9 +36,13 @@
 <!-- Judul ID / EN + slug (otomatis dari judul ID) -->
 @include('pages.cms.partials.title-slug-fields', ['maxTitleLength' => Limits::MAX_TITLE_LENGTH])
 
+@isset($afterTitle)
+    @include($afterTitle)
+@endisset
+
 <!-- Konten ID / EN -->
 @foreach ($languages as $lang => $langLabel)
-    <div>
+    <div @isset($hideWhen) x-show="!({{ $hideWhen }})" @endisset>
         <label for="content_{{ $lang }}" class="{{ $labelClass }}">
             Konten ({{ $langLabel }})@if ($lang === 'id')<span class="text-error-500">*</span>@endif
         </label>
@@ -93,7 +100,7 @@
     </div>
 
     <!-- Penulis -->
-    <div x-data="{ type: @js($authorType) }">
+    <div x-data="{ type: @js($authorType) }" @isset($hideWhen) x-show="!({{ $hideWhen }})" @endisset>
         <span class="{{ $labelClass }}">Penulis<span class="text-error-500">*</span></span>
         <div class="flex flex-wrap items-center gap-6">
             <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-400">

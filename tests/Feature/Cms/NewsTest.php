@@ -24,7 +24,7 @@ beforeEach(function () {
 function newsPayload(array $overrides = []): array
 {
     return array_merge([
-        'category' => 'ev_news',
+        'category' => 'news_release',
         'title' => ['id' => 'KOLEKSI Gelar Touring EV Jakarta-Bandung', 'en' => 'KOLEKSI Holds EV Touring Jakarta-Bandung'],
         'content' => ['id' => '<p>Isi <strong>berita</strong></p>', 'en' => '<p>News content</p>'],
         'status' => 'draft',
@@ -72,7 +72,7 @@ test('admin can create news authored by themselves with auto slug', function () 
 
     $news = News::sole();
 
-    expect($news->category)->toBe(NewsCategory::EvNews)
+    expect($news->category)->toBe(NewsCategory::NewsRelease)
         ->and($news->slug)->toBe('koleksi-gelar-touring-ev-jakarta-bandung')
         ->and($news->status)->toBe(ContentStatus::Published)
         ->and($news->published_at)->not->toBeNull()

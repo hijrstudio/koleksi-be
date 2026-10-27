@@ -99,10 +99,16 @@
                                 </span>
                             </td>
                             <td class="px-5 py-4 text-theme-sm">
-                                <p class="text-gray-800 dark:text-white/90">{{ $item->authorName() ?? 'Akun dihapus' }}</p>
-                                <span class="text-theme-xs text-gray-500 dark:text-gray-400">
-                                    {{ $item->authorType() === News::AUTHOR_MEMBER ? 'Member' : 'Admin' }}
-                                </span>
+                                @if ($item->isExternal())
+                                    {{-- Berita EV: penulis & nama media dari sumber berita --}}
+                                    <p class="text-gray-800 dark:text-white/90">{{ $item->source_author ?: ($item->source_name ?: '-') }}</p>
+                                    <span class="text-theme-xs text-gray-500 dark:text-gray-400">{{ $item->source_name ?: 'Media' }}</span>
+                                @else
+                                    <p class="text-gray-800 dark:text-white/90">{{ $item->authorName() ?? 'Akun dihapus' }}</p>
+                                    <span class="text-theme-xs text-gray-500 dark:text-gray-400">
+                                        {{ $item->authorType() === News::AUTHOR_MEMBER ? 'Member' : 'Admin' }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="px-5 py-4">
                                 <span class="rounded-full px-2.5 py-0.5 text-theme-xs font-medium {{ $item->status->badgeClass() }}">

@@ -34,9 +34,15 @@ class News extends Model
     protected $fillable = [
         'category',
         'title',
+        'summary',
         'content',
         'image',
         'status',
+        // Hanya berita dari media lain (NewsCategory::isExternal())
+        'source_url',
+        'source_name',
+        'source_author',
+        'source_published_on',
     ];
 
     /**
@@ -51,10 +57,18 @@ class News extends Model
         return [
             'category' => NewsCategory::class,
             'title' => 'array',
+            'summary' => 'array',
             'content' => 'array',
             'status' => ContentStatus::class,
             'published_at' => 'datetime',
+            'source_published_on' => 'date',
         ];
+    }
+
+    /** Berita dari media lain (kategori Berita EV): website membuka source_url di tab baru. */
+    public function isExternal(): bool
+    {
+        return $this->category?->isExternal() ?? false;
     }
 
     protected static function slugFallback(): string
@@ -65,5 +79,18 @@ class News extends Model
     public function scopePublished(Builder $query): void
     {
         $query->where('status', ContentStatus::Published);
+    }
+
+    /**
+     * Urutan tampil di website: Berita EV menurut tanggal berita di media sumber, kategori lain menurut
+     * tanggal publish di KOLEKSI — juga saat semua kategori dicampur (list tanpa filter, homepage).
+     */
+    public function scopeOrderByNewsDate(Builder $query, string $direction = 'desc'): void
+    {
+        $direction = strtolower($direction) === 'asc' ? 'asc' : 'desc'; // whitelist: masuk ke SQL mentah
+
+        $query->orderByRaw("COALESCE(source_published_on, published_at) {$direction}")
+            ->orderBy('published_at', $direction)
+            ->orderBy('id', $direction);
     }
 }

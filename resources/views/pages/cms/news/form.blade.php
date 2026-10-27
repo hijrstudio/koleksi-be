@@ -16,7 +16,7 @@
         </div>
     @endif
 
-    <form method="POST" enctype="multipart/form-data"
+    <form method="POST" enctype="multipart/form-data" x-data="{ category: @js($currentCategory ?? '') }"
         action="{{ $isEdit ? route('news.update', $news) : route('news.store') }}"
         class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         @csrf
@@ -29,7 +29,7 @@
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                     <label for="category" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Kategori<span class="text-error-500">*</span></label>
-                    <select id="category" name="category" required class="{{ $inputClass }} select-chevron {{ $borderClass('category') }}">
+                    <select id="category" name="category" required x-model="category" class="{{ $inputClass }} select-chevron {{ $borderClass('category') }}">
                         <option value="">Pilih kategori</option>
                         @foreach ($categories as $category)
                             <option value="{{ $category->value }}" @selected($currentCategory === $category->value)>{{ $category->label() }}</option>
@@ -49,6 +49,9 @@
                 'memberOptionsUrl' => route('news.member-options'),
                 'noun' => 'berita',
                 'slugPlaceholder' => 'koleksi-gelar-touring-ev-jakarta-bandung',
+                // Berita EV: link ke media lain — tanpa konten & penulis KOLEKSI
+                'afterTitle' => 'pages.cms.news.partials.external-fields',
+                'hideWhen' => "category === '".\App\Enums\NewsCategory::EvNews->value."'",
             ])
         </div>
 

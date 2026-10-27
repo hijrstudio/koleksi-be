@@ -21,6 +21,14 @@ enum NewsCategory: string
     }
 
     /**
+     * Berita dari media lain: judul + ringkasan + link ke sumber (tab baru), tanpa konten & penulis KOLEKSI.
+     */
+    public function isExternal(): bool
+    {
+        return $this === self::EvNews;
+    }
+
+    /**
      * Class badge TailAdmin untuk tiap kategori.
      */
     public function badgeClass(): string

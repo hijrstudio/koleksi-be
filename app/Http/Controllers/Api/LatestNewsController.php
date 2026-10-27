@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
  * Berita published terbaru untuk homepage.
- * Satu query tanpa relasi (tidak N+1), memakai index (status, published_at).
+ * Satu query tanpa relasi (tidak N+1). Urutan: News::scopeOrderByNewsDate (Berita EV menurut tanggal berita).
  */
 class LatestNewsController extends Controller
 {
@@ -18,10 +18,12 @@ class LatestNewsController extends Controller
     public function __invoke(): AnonymousResourceCollection
     {
         $news = News::query()
-            ->select(['id', 'category', 'title', 'slug', 'image', 'published_at', 'created_at'])
+            ->select([
+                'id', 'category', 'title', 'slug', 'image', 'published_at', 'created_at',
+                'summary', 'source_url', 'source_name', 'source_author', 'source_published_on', // Berita EV (media lain)
+            ])
             ->published()
-            ->latest('published_at')
-            ->latest('id')
+            ->orderByNewsDate()
             ->limit(self::LIMIT)
             ->get();
 

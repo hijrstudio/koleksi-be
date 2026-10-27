@@ -99,3 +99,72 @@ test('show returns 404 for draft news', function () {
 
     $this->withToken('test-token')->getJson(route('api.v1.news.show', $draft->slug))->assertNotFound();
 });
+
+test('ev news is ordered by its source date, other news by publish date', function () {
+    $ev = fn (string $title, string $publishedAt, string $sourceDate) => news([
+        'category' => NewsCategory::EvNews,
+        'title' => ['id' => $title, 'en' => $title],
+        'content' => null,
+        'published_at' => $publishedAt,
+        'source_url' => 'https://media.test/'.$title,
+        'source_name' => 'Media',
+        'source_published_on' => $sourceDate,
+    ]);
+
+    // Dipublish di CMS paling akhir, tapi beritanya paling lama → urutan terakhir
+    $old = $ev('lama', '2026-10-25 10:00:00', '2026-09-01');
+    $new = $ev('baru', '2026-10-01 10:00:00', '2026-10-20');
+    $release = news(['title' => ['id' => 'rilis', 'en' => 'rilis'], 'published_at' => '2026-10-10 10:00:00']);
+
+    $ids = fn (array $query = []) => collect(
+        $this->withToken('test-token')->getJson(route('api.v1.news.index', $query))->assertOk()->json('data')
+    )->pluck('id')->all();
+
+    expect($ids(['category' => 'ev_news']))->toBe([$new->id, $old->id])
+        ->and($ids(['category' => 'ev_news', 'sort' => 'oldest']))->toBe([$old->id, $new->id])
+        // Campuran: Berita EV memakai tanggal berita, News Release tanggal publish
+        ->and($ids())->toBe([$new->id, $release->id, $old->id]);
+
+    expect(collect($this->withToken('test-token')->getJson(route('api.v1.news.latest'))->json('data'))->pluck('id')->all())
+        ->toBe([$new->id, $release->id, $old->id]);
+});
+
+test('ev news cards carry the summary and source link instead of the internal author', function () {
+    $ev = news([
+        'category' => NewsCategory::EvNews,
+        'content' => null,
+        'summary' => ['id' => 'Ringkasan berita', 'en' => null],
+        'source_url' => 'https://www.kompas.com/berita-ev',
+        'source_name' => 'Kompas.com',
+        'source_author' => null,
+        'source_published_on' => '2026-10-20',
+    ]);
+    news(['title' => ['id' => 'Rilis resmi', 'en' => 'Release']]);
+
+    $this->withToken('test-token')->getJson(route('api.v1.news.index', ['category' => 'ev_news']))
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $ev->id)
+        ->assertJsonPath('data.0.category.external', true)
+        ->assertJsonPath('data.0.summary', ['id' => 'Ringkasan berita', 'en' => 'Ringkasan berita'])
+        ->assertJsonPath('data.0.author', 'Kompas.com') // penulis kosong → nama media
+        ->assertJsonPath('data.0.source', [
+            'url' => 'https://www.kompas.com/berita-ev',
+            'name' => 'Kompas.com',
+            'author' => null,
+            'published_on' => '2026-10-20',
+        ]);
+
+    // Pencarian juga mencakup nama media
+    $this->withToken('test-token')->getJson(route('api.v1.news.index', ['search' => 'kompas']))
+        ->assertOk()->assertJsonCount(1, 'data');
+
+    // Kategori lain: summary & source null
+    $this->withToken('test-token')->getJson(route('api.v1.news.index', ['category' => 'news_release']))
+        ->assertJsonPath('data.0.category.external', false)
+        ->assertJsonPath('data.0.summary', null)
+        ->assertJsonPath('data.0.source', null);
+
+    // Homepage (latest) juga membawa link sumber
+    $this->withToken('test-token')->getJson(route('api.v1.news.latest'))
+        ->assertOk()->assertJsonFragment(['url' => 'https://www.kompas.com/berita-ev']);
+});
