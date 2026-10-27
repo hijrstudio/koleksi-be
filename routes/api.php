@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\GalleryAlbumController;
 use App\Http\Controllers\Api\GuideArticleController;
 use App\Http\Controllers\Api\GuideInfographicController;
 use App\Http\Controllers\Api\GuidePlaybookController;
+use App\Http\Controllers\Api\GuideRegulationController;
 use App\Http\Controllers\Api\GuideVideoController;
 use App\Http\Controllers\Api\HeroBannerController;
 use App\Http\Controllers\Api\LatestEventController;
@@ -108,6 +109,12 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
     Route::prefix('guides/playbooks')->name('api.v1.guides.playbooks.')->controller(GuidePlaybookController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/{playbook}/file', 'file')->whereNumber('playbook')->name('file');
+    });
+
+    // Dokumen regulasi: list + isi PDF (dibuka di tab baru, siapa saja)
+    Route::prefix('guides/regulations')->name('api.v1.guides.regulations.')->controller(GuideRegulationController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{regulation}/file', 'file')->whereNumber('regulation')->name('file');
     });
 });
 

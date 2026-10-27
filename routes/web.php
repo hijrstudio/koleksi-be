@@ -11,6 +11,7 @@ use App\Http\Controllers\Cms\GuideArticleController;
 use App\Http\Controllers\Cms\GuideCategoryController;
 use App\Http\Controllers\Cms\GuideInfographicController;
 use App\Http\Controllers\Cms\GuidePlaybookController;
+use App\Http\Controllers\Cms\GuideRegulationController;
 use App\Http\Controllers\Cms\GuideVideoController;
 use App\Http\Controllers\Cms\HeroBannerController;
 use App\Http\Controllers\Cms\ManagementPeriodController;
@@ -65,6 +66,8 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     Route::resource('guide-infographics', GuideInfographicController::class)->except('show');
     Route::get('guide-playbooks/{guide_playbook}/pdf', [GuidePlaybookController::class, 'pdf'])->name('guide-playbooks.pdf');
     Route::resource('guide-playbooks', GuidePlaybookController::class)->except('show');
+    Route::get('guide-regulations/{guide_regulation}/pdf', [GuideRegulationController::class, 'pdf'])->name('guide-regulations.pdf');
+    Route::resource('guide-regulations', GuideRegulationController::class)->except('show');
 
     // berita
     Route::get('news/member-options', [NewsController::class, 'memberOptions'])->name('news.member-options');

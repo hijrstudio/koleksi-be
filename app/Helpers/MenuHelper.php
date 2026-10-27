@@ -59,6 +59,7 @@ class MenuHelper
                     ['name' => 'Video Edukasi', 'path' => '/guide-videos', 'match' => '/guide-videos', 'can' => 'guide-videos.view'],
                     ['name' => 'Infografis', 'path' => '/guide-infographics', 'match' => '/guide-infographics', 'can' => 'guide-infographics.view'],
                     ['name' => 'Web Playbook', 'path' => '/guide-playbooks', 'match' => '/guide-playbooks', 'can' => 'guide-playbooks.view'],
+                    ['name' => 'Dokumen Regulasi', 'path' => '/guide-regulations', 'match' => '/guide-regulations', 'can' => 'guide-regulations.view'],
                 ],
             ],
             [

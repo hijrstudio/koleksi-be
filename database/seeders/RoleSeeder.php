@@ -24,6 +24,7 @@ class RoleSeeder extends Seeder
         'guide-videos' => ['view', 'create', 'update', 'delete'],
         'guide-infographics' => ['view', 'create', 'update', 'delete'],
         'guide-playbooks' => ['view', 'create', 'update', 'delete'],
+        'guide-regulations' => ['view', 'create', 'update', 'delete'],
         'gallery-albums' => ['view', 'create', 'update', 'delete'],
         'news' => ['view', 'create', 'update', 'delete'],
         'event-categories' => ['view', 'create', 'update', 'delete'],
