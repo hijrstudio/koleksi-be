@@ -125,8 +125,9 @@ test('ev news is ordered by its source date, other news by publish date', functi
         // Campuran: Berita EV memakai tanggal berita, News Release tanggal publish
         ->and($ids())->toBe([$new->id, $release->id, $old->id]);
 
+    // Homepage: News Release terbaru, Berita EV terbaru & terlama (menurut tanggal berita)
     expect(collect($this->withToken('test-token')->getJson(route('api.v1.news.latest'))->json('data'))->pluck('id')->all())
-        ->toBe([$new->id, $release->id, $old->id]);
+        ->toBe([$release->id, $new->id, $old->id]);
 });
 
 test('ev news cards carry the summary and source link instead of the internal author', function () {
