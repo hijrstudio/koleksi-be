@@ -43,7 +43,10 @@ bisa `fork` sama sekali (`pthread_create failed: Resource temporarily unavailabl
 | `pids_limit` per container | container bermasalah tidak bisa menghabiskan thread seluruh VPS |
 | Image dibangun di GitHub Actions | build (BuildKit, worker Next.js per CPU) di VPS memakan ratusan thread |
 
-**Jangan** menjalankan `docker compose build` di VPS. Untuk mengukur sisa thread:
+**Jangan** menjalankan `docker compose build` di VPS. **Jangan pasang `pigz`**: containerd memakai `unpigz` untuk
+mengekstrak layer image dengan thread sebanyak jumlah CPU (12), dan deploy gagal (`unpigz: resource unavailable`).
+Hapus dengan `sudo apt-get remove -y pigz` (Docker memakai dekompresi bawaannya). `deploy.sh` juga menjalankan CLI
+docker dengan `GOMAXPROCS=1` dan mengunduh image bergantian. Untuk mengukur sisa thread:
 
 ```bash
 python3 -c "import threading as t;e=t.Event();n=0

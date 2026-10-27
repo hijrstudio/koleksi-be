@@ -16,7 +16,14 @@ fi
 
 set -a; . ./.env; set +a
 
-docker compose pull app fe
+# Batas thread OpenVZ (README "Batas thread OpenVZ"): sisa thread VPS bisa tinggal ±25 saat app & fe berjalan.
+#  - GOMAXPROCS=1: CLI docker/compose (Go) tidak membuat thread sebanyak jumlah CPU (12). Tidak diteruskan ke
+#    container (docker-compose.yml tidak mereferensikannya).
+#  - pull bergantian: ekstraksi layer image app & fe tidak berjalan bersamaan.
+#  - paket pigz sebaiknya tidak terpasang: containerd memakai unpigz (thread = jumlah CPU) untuk ekstraksi layer.
+export GOMAXPROCS=1
+docker compose pull app
+docker compose pull fe
 # </dev/null: `compose run` membaca stdin & bisa menelan sisa skrip
 #   RoleSeeder idempoten (findOrCreate): permission modul CMS baru ikut terdaftar
 docker compose run --rm -T app sh -c 'php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force' </dev/null
