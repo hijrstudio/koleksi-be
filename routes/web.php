@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Cms\AboutUsController;
 use App\Http\Controllers\Cms\EventCategoryController;
 use App\Http\Controllers\Cms\EventController;
+use App\Http\Controllers\Cms\EventVideoController;
 use App\Http\Controllers\Cms\FaqController;
 use App\Http\Controllers\Cms\GalleryAlbumController;
 use App\Http\Controllers\Cms\GuideArticleController;
@@ -75,6 +76,7 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     // kegiatan
     Route::resource('event-categories', EventCategoryController::class)->except('show');
     Route::resource('events', EventController::class)->except('show');
+    Route::resource('event-videos', EventVideoController::class)->except('show');
 
     // partner
     Route::resource('partners', PartnerController::class)->except('show');

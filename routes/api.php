@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AboutController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\EventVideoController;
 use App\Http\Controllers\Api\EvGarageController;
 use App\Http\Controllers\Api\GalleryAlbumController;
 use App\Http\Controllers\Api\GuideArticleController;
@@ -55,6 +56,8 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
     Route::get('/events/categories', [EventController::class, 'categories'])->name('api.v1.events.categories');
     // /events/latest & /events/categories didaftarkan lebih dulu, jadi tidak tertangkap sebagai {slug}
     Route::get('/events/{slug}', [EventController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('api.v1.events.show');
+    // Bukan /events/videos supaya tidak bentrok dengan slug kegiatan
+    Route::get('/event-videos', [EventVideoController::class, 'index'])->name('api.v1.event-videos.index');
     Route::get('/partners', [PartnerController::class, 'index'])->name('api.v1.partners.index');
     Route::get('/sponsors', [SponsorController::class, 'index'])->name('api.v1.sponsors.index');
     Route::get('/about', AboutController::class)->name('api.v1.about');

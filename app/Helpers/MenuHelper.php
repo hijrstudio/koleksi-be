@@ -74,14 +74,9 @@ class MenuHelper
                 'subItems' => [
                     ['name' => 'Kategori', 'path' => '/event-categories', 'match' => '/event-categories', 'can' => 'event-categories.view'],
                     ['name' => 'Event', 'path' => '/events', 'match' => '/events', 'can' => 'events.view'],
+                    ['name' => 'Video', 'path' => '/event-videos', 'match' => '/event-videos', 'can' => 'event-videos.view'],
+                    ['name' => 'Galeri Foto', 'path' => '/gallery-albums', 'match' => '/gallery-albums', 'can' => 'gallery-albums.view'],
                 ],
-            ],
-            [
-                'icon' => 'gallery',
-                'name' => 'Galeri Foto',
-                'path' => '/gallery-albums',
-                'match' => '/gallery-albums',
-                'can' => 'gallery-albums.view',
             ],
             [
                 'icon' => 'partner',
