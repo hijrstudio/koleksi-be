@@ -291,6 +291,18 @@ docker stats --no-stream                                                     # k
 sudo tail -f /usr/local/apps/apache2/logs/error_log      # error reverse proxy (502/503 = container mati)
 ```
 
+### Migrasi saat deploy & rollback
+
+`deploy.sh` tidak lagi menjalankan migrasi lewat `compose run` (container ketiga melampaui batas thread: `runc did
+not terminate successfully: exit status 134`). Migrasi + RoleSeeder dijalankan `docker/entrypoint.sh` setiap
+container `app` start (`RUN_MIGRATIONS=true`), sebelum web, queue & scheduler menyala. Kalau migrasi gagal, container
+`app` tidak start (CMS & API mati); lihat penyebabnya lalu kembali ke image sebelumnya:
+
+```bash
+docker compose logs --tail 50 app                     # pesan error migrasi
+IMAGE_TAG=<sha commit sebelumnya> docker compose up -d --no-deps app   # image lama (tag :<sha> dari GitHub Actions)
+```
+
 ### Pemutihan tunggakan iuran
 
 Kebijakan pengurus (Okt 2026): tunggakan sebelum periode 2026-2027 diputihkan; yang ditagih mulai periode 2026-2027

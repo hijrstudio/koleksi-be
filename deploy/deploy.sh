@@ -24,9 +24,9 @@ set -a; . ./.env; set +a
 export GOMAXPROCS=1
 docker compose pull app
 docker compose pull fe
-# </dev/null: `compose run` membaca stdin & bisa menelan sisa skrip
-#   RoleSeeder idempoten (findOrCreate): permission modul CMS baru ikut terdaftar
-docker compose run --rm -T app sh -c 'php artisan migrate --force && php artisan db:seed --class=RoleSeeder --force' </dev/null
+# Migrasi & RoleSeeder TIDAK lewat `compose run`: container ketiga di samping app & fe melampaui batas thread
+# (runc abort, exit 134). docker/entrypoint.sh menjalankannya saat container app baru start (RUN_MIGRATIONS),
+# sebelum web melayani request. </dev/null: compose bisa membaca stdin & menelan sisa skrip.
 docker compose up -d --remove-orphans </dev/null
 
 # `compose up` tidak selalu mendeteksi tag :latest yang berubah: ganti container yang image-nya tertinggal

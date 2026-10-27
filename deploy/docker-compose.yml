@@ -27,6 +27,8 @@ services:
       APP_BIND: 127.0.0.1
       APP_PORT: ${APP_PORT:-8080}
       PHP_THREADS: ${PHP_THREADS:-4}
+      # Migrasi + RoleSeeder dijalankan docker/entrypoint.sh saat container start (lihat deploy.sh)
+      RUN_MIGRATIONS: "true"
       DB_CONNECTION: mariadb
       DB_HOST: ${DB_HOST:-127.0.0.1}
       DB_PORT: ${DB_PORT:-3306}
