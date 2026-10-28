@@ -216,6 +216,31 @@ test('callback with a wrong X-CLIENT-KEY is rejected', function () {
         ->and(PaymentNotification::first()->response_status)->toBe(401);
 });
 
+test('probe sends the same signed request with overridable token and headers', function () {
+    Http::fake([
+        BASE.'/openapi/v1.0/qr-acq/mpm/generate' => Http::response(['responseCode' => '4014701', 'responseMessage' => 'Access Token Invalid'], 401),
+    ]);
+    $client = YoduClient::make();
+
+    $res = $client->probe('/openapi/v1.0/qr-acq/mpm/generate', ['a' => 1], token: 'BAD-TOKEN', headerOverrides: [
+        'X-EXTERNAL-ID' => 'FIXED-ID',
+        'ORIGIN' => null,
+    ]);
+
+    expect($res['http'])->toBe(401)
+        ->and($res['response']['responseCode'])->toBe('4014701')
+        ->and($res['url'])->toBe(BASE.'/openapi/v1.0/qr-acq/mpm/generate')
+        ->and($res['body'])->toBe('{"a":1}')
+        ->and($res['headers']['Authorization'])->toBe('Bearer BAD-TOKEN')
+        ->and($res['headers'])->not->toHaveKey('ORIGIN');
+
+    Http::assertSent(fn (Request $r) => $r->hasHeader('X-EXTERNAL-ID', 'FIXED-ID')
+        && $r->hasHeader('Authorization', 'Bearer BAD-TOKEN')
+        && ! $r->hasHeader('ORIGIN')
+        && $r->header('X-SIGNATURE')[0] === (new YoduSigner('CLIENT-ID', 'CLIENT-SECRET', file_get_contents(base_path('tests/Fixtures/yodu-test-private.pem'))))
+            ->symmetric('POST', '/openapi/v1.0/qr-acq/mpm/generate', 'BAD-TOKEN', '{"a":1}', $r->header('X-TIMESTAMP')[0]));
+});
+
 test('private key from YODU_PRIVATE_KEY (base64 PEM) takes precedence over the file path', function () {
     config([
         'yodu.private_key' => base64_encode(file_get_contents(base_path('tests/Fixtures/yodu-test-private.pem'))),

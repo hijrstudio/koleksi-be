@@ -125,9 +125,24 @@ class YoduClient
     private function send(string $path, array $body, string $token): Response
     {
         $json = YoduSigner::minify($body);
+
+        return $this->http()
+            ->withHeaders($this->transactionHeaders($path, $json, $token))
+            ->withBody($json, 'application/json')   // kirim string yang SAMA dengan yang di-hash
+            ->post($path);
+    }
+
+    /**
+     * Header request transaksi bersignature.
+     *
+     * @return array<string, string>
+     */
+    private function transactionHeaders(string $path, string $json, string $token): array
+    {
         $timestamp = self::timestamp();
 
         $headers = [
+            'Authorization' => 'Bearer '.$token,
             'X-TIMESTAMP' => $timestamp,
             'X-SIGNATURE' => $this->signer->symmetric('POST', $path, $token, $json, $timestamp),
             'X-PARTNER-ID' => $this->config['client_id'],
@@ -141,11 +156,35 @@ class YoduClient
             $headers['X-CLIENT-KEY'] = $this->config['client_secret'];
         }
 
-        return $this->http()
-            ->withToken($token)
-            ->withHeaders($headers)
-            ->withBody($json, 'application/json')   // kirim string yang SAMA dengan yang di-hash
-            ->post($path);
+        return $headers;
+    }
+
+    /**
+     * Request mentah untuk uji fungsional (yodu:uji-fungsional): sama dengan request aplikasi, tapi token, header
+     * (null = dibuang) dan body string bisa diganti supaya skenario error bisa dipicu. Tanpa retry token.
+     * Signature dihitung SETELAH token & body diganti, kecuali X-SIGNATURE ikut ditimpa.
+     *
+     * @param  array<string, mixed>|string  $body
+     * @param  array<string, string|null>  $headerOverrides
+     * @return array{url: string, headers: array<string, string>, body: string, http: int, response: array<mixed>|string}
+     */
+    public function probe(string $path, array|string $body, ?string $token = null, array $headerOverrides = []): array
+    {
+        $json = is_string($body) ? $body : YoduSigner::minify($body);
+        $headers = array_filter(
+            array_merge($this->transactionHeaders($path, $json, $token ?? $this->accessToken()), $headerOverrides),
+            fn ($value) => $value !== null,
+        );
+
+        $res = $this->http()->withHeaders($headers)->withBody($json, 'application/json')->post($path);
+
+        return [
+            'url' => rtrim($this->config['base_url'], '/').$path,
+            'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/json'] + $headers,
+            'body' => $json,
+            'http' => $res->status(),
+            'response' => $res->json() ?? $res->body(),
+        ];
     }
 
     /** responseCode sukses: HTTP 200 + kode kasus "00" (2008200, 2005100, 2007500 ...). */
