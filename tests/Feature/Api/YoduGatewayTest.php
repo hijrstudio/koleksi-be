@@ -2,6 +2,7 @@
 
 use App\Models\Member;
 use App\Models\Payment;
+use App\Models\PaymentNotification;
 use App\Payments\Data\TxStatus;
 use App\Payments\Gateways\YoduGateway;
 use App\Payments\Yodu\YoduClient;
@@ -179,20 +180,40 @@ test('sandbox callback is matched by YODU reference and confirmed by a flat stat
 
     $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
         ->assertOk()
-        ->assertJsonPath('responseCode', '00');
+        ->assertJsonPath('responseCode', '2005200')
+        ->assertJsonPath('responseMessage', 'Successful');
 
-    $log = \App\Models\PaymentNotification::first();
+    $log = PaymentNotification::first();
     expect($this->payment->fresh()->status)->toBe(Payment::SUCCESS)
         ->and($log->merchant_ref)->toBe('KLK0007-261012170105-ABC123')
-        ->and($log->headers)->not->toHaveKey('x-client-key');
+        ->and($log->headers)->not->toHaveKey('x-client-key')
+        ->and($log->response_status)->toBe(200)
+        ->and(json_decode($log->response, true)['responseCode'])->toBe('2005200');
+});
+
+test('failed transaction callback (06) is also answered with 2005200 Successful', function () {
+    $this->payment->update(['gateway_qr_id' => 'QR-1']);
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response(['responseCode' => '2005100', 'responseData' => ['latestTransactionStatus' => '06']]),
+    ]);
+
+    $this->postJson('/api/payments/yodu/callback', ['latestTransactionStatus' => '06'] + sandboxCallback(), ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
+        ->assertOk()
+        ->assertJsonPath('responseCode', '2005200')
+        ->assertJsonPath('responseMessage', 'Successful');
+
+    expect($this->payment->fresh()->status)->not->toBe(Payment::SUCCESS);
 });
 
 test('callback with a wrong X-CLIENT-KEY is rejected', function () {
     $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'salah'])
-        ->assertOk()
-        ->assertJsonPath('responseCode', '01');
+        ->assertUnauthorized()
+        ->assertJsonPath('responseCode', '4015200')
+        ->assertJsonPath('responseMessage', 'Unauthorized');
 
-    expect($this->payment->fresh()->status)->toBe(Payment::PENDING);
+    expect($this->payment->fresh()->status)->toBe(Payment::PENDING)
+        ->and(PaymentNotification::first()->response_status)->toBe(401);
 });
 
 test('private key from YODU_PRIVATE_KEY (base64 PEM) takes precedence over the file path', function () {

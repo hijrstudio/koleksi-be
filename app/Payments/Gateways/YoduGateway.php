@@ -21,11 +21,16 @@ use Throwable;
  */
 class YoduGateway implements PaymentGateway
 {
-    private const PATH_GENERATE = '/openapi/v1.0/qr-acq/mpm/generate';
+    public const PATH_GENERATE = '/openapi/v1.0/qr-acq/mpm/generate';
 
-    private const PATH_CANCEL = '/openapi/v1.0/qr-acq/mpm/cancelqr';
+    public const PATH_CANCEL = '/openapi/v1.0/qr-acq/mpm/cancelqr';
 
-    private const PATH_STATUS = '/openapi/v1.0/qr-acq/paystatus';
+    public const PATH_STATUS = '/openapi/v1.0/qr-acq/paystatus';
+
+    /** Jawaban callback (Payment Notification, service code 52) sesuai uji fungsional YODU 18.18/18.19. */
+    public const CALLBACK_OK = ['code' => '2005200', 'message' => 'Successful'];
+
+    public const CALLBACK_REJECTED = ['code' => '4015200', 'message' => 'Unauthorized'];
 
     private const RC_NOT_FOUND = '5008203';
 
@@ -41,21 +46,51 @@ class YoduGateway implements PaymentGateway
         return 'yodu';
     }
 
-    public function createQr(Payment $payment): QrResult
+    /**
+     * Body Generate QR (dipakai aplikasi & yodu:uji-fungsional).
+     *
+     * @return array<string, mixed>
+     */
+    public function qrRequestBody(string $merchantRef, int $amount): array
     {
-        $body = [
-            'partnerReferenceNo' => $payment->merchant_ref,
+        return [
+            'partnerReferenceNo' => $merchantRef,
             'merchantId' => $this->config['merchant_id'],
             'storeId' => $this->config['store_id'],
             'terminalId' => $this->config['terminal_id'],
             'qrType' => '03',
-            'amount' => ['value' => self::money($payment->amount), 'currency' => 'IDR'],
+            'amount' => ['value' => self::money($amount), 'currency' => 'IDR'],
             'withFee' => '0',                                     // member bayar pas, tanpa tip
             'feeType' => '',
             'feeAmount' => ['value' => '', 'currency' => 'IDR'],
             'expiryPeriod' => (string) $this->config['qr_expiry_seconds'],
             'additionalInfo' => (object) [],
         ];
+    }
+
+    /**
+     * Body cek status (dipakai aplikasi & yodu:uji-fungsional).
+     *
+     * @return array<string, mixed>
+     */
+    public function statusRequestBody(Payment $payment): array
+    {
+        return [
+            'partnerReferenceNo' => YoduClient::uniqueRef('S'),
+            'originalReferenceNo' => $payment->gateway_ref ?? '',
+            'originalPartnerReferenceNo' => $payment->merchant_ref,
+            'originalRequestDate' => $payment->created_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP'),
+            'serviceCode' => '47',
+            'merchantId' => $this->config['merchant_id'],
+            'storeId' => $this->config['store_id'],
+            'terminalId' => $this->config['terminal_id'],
+            'additionalInfo' => (object) [],
+        ];
+    }
+
+    public function createQr(Payment $payment): QrResult
+    {
+        $body = $this->qrRequestBody($payment->merchant_ref, $payment->amount);
 
         $res = $this->client()->post(self::PATH_GENERATE, $body);
         $json = $res['body'];
@@ -97,17 +132,7 @@ class YoduGateway implements PaymentGateway
     public function checkStatus(Payment $payment): ?TxStatus
     {
         try {
-            $res = $this->client()->post(self::PATH_STATUS, [
-                'partnerReferenceNo' => YoduClient::uniqueRef('S'),
-                'originalReferenceNo' => $payment->gateway_ref ?? '',
-                'originalPartnerReferenceNo' => $payment->merchant_ref,
-                'originalRequestDate' => $payment->created_at->copy()->setTimezone('Asia/Jakarta')->format('Y-m-d\TH:i:sP'),
-                'serviceCode' => '47',
-                'merchantId' => $this->config['merchant_id'],
-                'storeId' => $this->config['store_id'],
-                'terminalId' => $this->config['terminal_id'],
-                'additionalInfo' => (object) [],
-            ]);
+            $res = $this->client()->post(self::PATH_STATUS, $this->statusRequestBody($payment));
         } catch (Throwable $e) {
             report($e);
 
@@ -192,20 +217,25 @@ class YoduGateway implements PaymentGateway
         return $payment->merchant_ref ?? $ref;
     }
 
+    /**
+     * Notifikasi diterima (status apa pun, termasuk gagal "06") = 200 + 2005200 "Successful".
+     * Ditolak verifikasi (IP / X-CLIENT-KEY / format) = 401 + 4015200 "Unauthorized".
+     */
     public function callbackResponse(bool $ok, array $payload = []): Response
     {
         $now = YoduClient::timestamp();
+        $result = $ok ? self::CALLBACK_OK : self::CALLBACK_REJECTED;
 
         return response()->json([
+            'responseCode' => $result['code'],
+            'responseMessage' => $result['message'],
             'partnerReferenceNo' => (string) ($payload['partnerReferenceNo'] ?? ''),
             'referenceNo' => YoduClient::uniqueRef('CB'),
             'originalReferenceNo' => (string) ($payload['originalReferenceNo'] ?? ''),
             'originalPartnerReferenceNo' => (string) ($payload['originalPartnerReferenceNo'] ?? ''),
-            'responseCode' => $ok ? '00' : '01',
-            'responseMessage' => $ok ? 'Success' : 'Rejected',
             'receivedTime' => $now,
             'additionalInfo' => (object) [],
-        ], 200, ['X-TIMESTAMP' => $now]);
+        ], $ok ? 200 : 401, ['X-TIMESTAMP' => $now]);
     }
 
     // ------------------------------------------------------------------

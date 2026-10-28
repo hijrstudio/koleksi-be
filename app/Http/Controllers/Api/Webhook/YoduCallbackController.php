@@ -43,7 +43,7 @@ class YoduCallbackController extends Controller
         if (strlen($body) > self::MAX_BODY_BYTES || $payload === [] || ! $gateway->verifyCallback($request)) {
             $log->update(['error' => 'Ditolak verifikasi awal (IP / format)']);
 
-            return $gateway->callbackResponse(false, $payload);
+            return $this->reply($log, $gateway->callbackResponse(false, $payload));
         }
 
         $tx = $gateway->parseCallback($request);
@@ -58,6 +58,17 @@ class YoduCallbackController extends Controller
             }
         })->afterResponse();
 
-        return $gateway->callbackResponse(true, $payload);
+        return $this->reply($log, $gateway->callbackResponse(true, $payload));
+    }
+
+    /** Jawaban kita ikut dicatat (bukti uji fungsional & debug). */
+    private function reply(PaymentNotification $log, Response $response): Response
+    {
+        $log->update([
+            'response_status' => $response->getStatusCode(),
+            'response' => Str::limit((string) $response->getContent(), 2000, ''),
+        ]);
+
+        return $response;
     }
 }

@@ -9,7 +9,7 @@ class PaymentNotification extends Model
 {
     protected $fillable = [
         'gateway', 'merchant_ref', 'gateway_status', 'accepted', 'processed',
-        'ip', 'headers', 'body', 'error',
+        'ip', 'headers', 'body', 'response_status', 'response', 'error',
     ];
 
     protected function casts(): array
