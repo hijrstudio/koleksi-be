@@ -57,7 +57,7 @@ test('runs the generate QR scenarios and writes a copy-ready report', function (
 
         return match (true) {
             $request->header('Authorization')[0] !== 'Bearer GOOD-TOKEN' => Http::response(['responseCode' => '4014701', 'responseMessage' => 'Access Token Invalid'], 401),
-            ! isset($body['amount']) => Http::response(['responseCode' => '4004702', 'responseMessage' => 'Invalid Mandatory Field {amount}'], 400),
+            ! isset($body['merchantId']) => Http::response(['responseCode' => '4004702', 'responseMessage' => 'Invalid Mandatory Field {merchantId}'], 400),
             $body['amount']['value'] === 'abc' => Http::response(['responseCode' => '4004701', 'responseMessage' => 'Invalid Field Format {amount.value}'], 400),
             $body['merchantId'] === '999999999' => Http::response(['responseCode' => '4044708', 'responseMessage' => 'Invalid Merchant'], 404),
             default => Http::response(['responseCode' => '2008000', 'responseMessage' => 'Successful', 'responseData' => ['qrContent' => 'QRIS']]),
@@ -73,6 +73,9 @@ test('runs the generate QR scenarios and writes a copy-ready report', function (
         ->toContain('"responseCode": "4014701"')
         ->toContain('"responseCode": "4044708"')
         ->toContain('Hasil: SESUAI (responseCode 2008000)')
+        ->toContain('- tanpa partnerReferenceNo → 2008000 Successful')   // field opsional di sandbox: lanjut ke field berikut
+        ->toContain('- tanpa merchantId → 4004702 Invalid Mandatory Field {merchantId}')
+        ->not->toContain('- tanpa amount')                               // berhenti di percobaan pertama yang sesuai
         ->not->toContain('TIDAK SESUAI')
         ->not->toContain('## 18.2');
 });
@@ -93,6 +96,18 @@ test('the same X-EXTERNAL-ID is sent twice for 18.5', function () {
 
     expect($ids)->toHaveCount(2)->and($ids[0])->toBe($ids[1])
         ->and(ujiReport())->toContain('Hasil: SESUAI (responseCode 4094700)');
+});
+
+test('a callback logged before replies were recorded is skipped, not failed', function () {
+    PaymentNotification::create([
+        'gateway' => 'yodu', 'gateway_status' => '00', 'accepted' => true,
+        'headers' => [], 'body' => '{"latestTransactionStatus":"00"}',
+    ]);
+    Http::fake();
+
+    $this->artisan('yodu:uji-fungsional', ['--case' => ['18.18']])->assertSuccessful();
+
+    expect(ujiReport())->toContain('Hasil: DILEWATI')->toContain('masuk sebelum respons kita dicatat');
 });
 
 test('callback and status cases use logged callbacks and the last paid transaction', function () {

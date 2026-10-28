@@ -79,8 +79,8 @@ class YoduFunctionalTest extends Command
         Storage::disk('local')->put($path, $this->report($results));
 
         $this->newLine();
-        $this->table(['No', 'Skenario', 'Expected', 'Response', 'Hasil'], array_map(fn (array $r) => [
-            $r['no'], $r['title'], $r['expected'][0], $r['code'] ?? '-', $this->verdict($r),
+        $this->table(['No', 'Expected', 'Response', 'Pesan YODU', 'Hasil'], array_map(fn (array $r) => [
+            $r['no'], $r['expected'][0], $r['code'] ?? '-', Str::limit((string) ($r['message'] ?? $r['skipped'] ?? $r['error'] ?? ''), 60), $this->verdict($r),
         ], $results));
         $this->info('Laporan: '.Storage::disk('local')->path($path));
 
@@ -102,9 +102,16 @@ class YoduFunctionalTest extends Command
             '18.2' => ['Any Service: Unauthorized Signature', ['401xx00', 'Unauthorized Signature'],
                 fn () => $this->send($generate, $this->qrBody(), headers: ['X-SIGNATURE' => base64_encode(random_bytes(64))])],
             '18.3' => ['Any Service: Missing Mandatory Field', ['400xx02', 'Invalid Mandatory Field {...}'],
-                fn () => $this->send($generate, collect($this->qrBody())->except('amount')->all())],
+                fn () => $this->firstMatching('400xx02', collect(['partnerReferenceNo', 'merchantId', 'amount', 'qrType', 'terminalId'])
+                    ->mapWithKeys(fn (string $field) => ["tanpa {$field}" => fn () => $this->send($generate, collect($this->qrBody())->except($field)->all())])
+                    ->all())],
             '18.4' => ['Any Service: Invalid Field Format', ['400xx01', 'Invalid Field Format {...}'],
-                fn () => $this->send($generate, ['amount' => ['value' => 'abc', 'currency' => 'IDR']] + $this->qrBody())],
+                fn () => $this->firstMatching('400xx01', [
+                    'amount.value "abc"' => fn () => $this->send($generate, ['amount' => ['value' => 'abc', 'currency' => 'IDR']] + $this->qrBody()),
+                    'amount.value tanpa desimal' => fn () => $this->send($generate, ['amount' => ['value' => (string) $this->option('amount'), 'currency' => 'IDR']] + $this->qrBody()),
+                    'qrType "XX"' => fn () => $this->send($generate, ['qrType' => 'XX'] + $this->qrBody()),
+                    'expiryPeriod "abc"' => fn () => $this->send($generate, ['expiryPeriod' => 'abc'] + $this->qrBody()),
+                ])],
             '18.5' => ['Any Service: Cannot use the same X-EXTERNAL-ID', ['409xx00', 'Conflict'], function () use ($generate) {
                 $externalId = YoduClient::uniqueRef('UJI');
                 $this->send($generate, $this->qrBody(), headers: ['X-EXTERNAL-ID' => $externalId]); // request pertama
@@ -114,7 +121,10 @@ class YoduFunctionalTest extends Command
             '18.6' => ['QR MPM - Generate QR: Show QR Code', ['200xx00', 'Successful'],
                 fn () => $this->send($generate, $this->qrBody())],
             '18.7' => ['QR MPM - Generate QR: Invalid Merchant', ['4044708', 'Invalid Merchant'],
-                fn () => $this->send($generate, ['merchantId' => '999999999'] + $this->qrBody())],
+                fn () => $this->firstMatching('4044708', [
+                    'merchantId tidak terdaftar' => fn () => $this->send($generate, ['merchantId' => '999999999'] + $this->qrBody()),
+                    'merchantId + storeId tidak terdaftar' => fn () => $this->send($generate, ['merchantId' => '999999999', 'storeId' => '999999999000'] + $this->qrBody()),
+                ])],
             '18.18' => ['Payment Notification: Successful Transaction (00)', ['2005200', 'Successful'],
                 fn () => $this->callback('00')],
             '18.19' => ['Payment Notification: Failed Transaction (06)', ['2005200', 'Successful'],
@@ -139,7 +149,35 @@ class YoduFunctionalTest extends Command
     {
         $res = $this->client->probe($path, $body, $token, $headers);
 
-        return $res + ['code' => is_array($res['response']) ? ($res['response']['responseCode'] ?? null) : null];
+        return $res + [
+            'code' => is_array($res['response']) ? ($res['response']['responseCode'] ?? null) : null,
+            'message' => is_array($res['response']) ? ($res['response']['responseMessage'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Jalankan variasi request berurutan; berhenti di yang pertama menghasilkan kode expected. Semua percobaan
+     * dicatat di laporan supaya terlihat field mana yang divalidasi YODU.
+     *
+     * @param  array<string, callable(): array<string, mixed>>  $attempts  label => request
+     * @return array<string, mixed>
+     */
+    private function firstMatching(string $expected, array $attempts): array
+    {
+        $pattern = '/^'.str_replace('xx', '\d\d', $expected).'$/';
+        $tried = [];
+        $result = [];
+
+        foreach ($attempts as $label => $attempt) {
+            $result = $attempt();
+            $tried[] = "{$label} → ".($result['code'] ?? 'HTTP '.$result['http']).' '.($result['message'] ?? '');
+
+            if (preg_match($pattern, (string) ($result['code'] ?? ''))) {
+                break;
+            }
+        }
+
+        return $result + ['note' => "Percobaan:\n- ".implode("\n- ", $tried)];
     }
 
     /** @return array<string, mixed> */
@@ -152,9 +190,16 @@ class YoduFunctionalTest extends Command
             ->latest('id')
             ->first();
 
+        $case = $status === '00' ? '18.18' : '18.19';
+
         if (! $log) {
             return ['skipped' => "Belum ada callback sandbox dengan latestTransactionStatus \"{$status}\". "
-                .'Picu notifikasi dari sandbox YODU, lalu jalankan ulang: --case='.($status === '00' ? '18.18' : '18.19')];
+                ."Picu notifikasi dari sandbox YODU, lalu jalankan ulang: --case={$case}"];
+        }
+
+        if ($log->response === null) {
+            return ['skipped' => "Callback \"{$status}\" terakhir (log #{$log->id}) masuk sebelum respons kita dicatat. "
+                ."Picu notifikasi baru dari sandbox YODU, lalu jalankan ulang: --case={$case}"];
         }
 
         $response = json_decode((string) $log->response, true);
@@ -166,6 +211,7 @@ class YoduFunctionalTest extends Command
             'http' => $log->response_status,
             'response' => $response ?? $log->response,
             'code' => is_array($response) ? ($response['responseCode'] ?? null) : null,
+            'message' => is_array($response) ? ($response['responseMessage'] ?? null) : null,
             'note' => "Callback diterima {$log->created_at?->timezone('Asia/Jakarta')->format('Y-m-d H:i:s')} WIB (log #{$log->id}).",
         ];
     }
