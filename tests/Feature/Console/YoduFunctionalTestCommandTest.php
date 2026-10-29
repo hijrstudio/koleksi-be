@@ -108,6 +108,10 @@ test('query payment cases check a paid transaction and an unknown reference', fu
             return Http::response(['responseCode' => '2007300', 'accessToken' => 'GOOD-TOKEN']);
         }
 
+        if (str_ends_with($request->url(), '/generate')) {
+            return Http::response(['responseCode' => '2008000', 'responseMessage' => 'Successful', 'referenceNo' => 'ORD-UNPAID-1']);
+        }
+
         return json_decode($request->body(), true)['originalPartnerReferenceNo'] === 'KLK0001-PAID'
             ? Http::response(['responseCode' => '2008200', 'responseMessage' => 'Approved', 'latestTransactionStatus' => '00'])
             : Http::response(['responseCode' => '4045101', 'responseMessage' => 'Transaction Not Found'], 404);
@@ -120,9 +124,16 @@ test('query payment cases check a paid transaction and an unknown reference', fu
         ->toContain('Transaksi KLK0001-PAID, latestTransactionStatus: 00.')
         ->toContain('## 18.17 Query Payment: Transaction Not Found')
         ->toContain('Hasil: SESUAI (responseCode 4045101)')
+        ->toContain('referenceNo ORD-UNPAID-1 (dari respons Generate QR, 2008000)')
         ->not->toContain('TIDAK SESUAI');
 
-    expect(Payment::count())->toBe(1); // referensi palsu 18.17 tidak disimpan
+    // 18.17 mengecek referenceNo dari Generate QR yang belum dibayar, dengan partnerReferenceNo QR yang sama
+    $generated = Http::recorded()->map(fn ($pair) => $pair[0])->first(fn (Request $r) => str_ends_with($r->url(), '/generate'));
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/paystatus')
+        && json_decode($r->body(), true)['originalReferenceNo'] === 'ORD-UNPAID-1'
+        && json_decode($r->body(), true)['originalPartnerReferenceNo'] === json_decode($generated->body(), true)['partnerReferenceNo']);
+
+    expect(Payment::count())->toBe(1); // QR uji 18.17 tidak disimpan
 });
 
 test('a callback logged before replies were recorded is skipped, not failed', function () {

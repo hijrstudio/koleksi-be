@@ -18,7 +18,7 @@ use Throwable;
  *
  *   18.1–18.7  dijalankan langsung (Generate QR + skenario error)
  *   18.15/24   cek status transaksi yang sudah dibayar (Payment SUCCESS terakhir, atau --ref)
- *   18.17      cek status nomor referensi yang tidak ada (Transaction Not Found)
+ *   18.17      generate QR baru lalu cek statusnya tanpa dibayar (Transaction Not Found, arahan YODU)
  *   18.18/19   diambil dari log callback (payment_notifications): butuh notifikasi sukses / gagal dari sandbox
  *
  * Query Payment (18.15/18.17) & Transaction Status Inquiry (18.24) memakai API Check Status YODU yang sama
@@ -246,20 +246,31 @@ class YoduFunctionalTest extends Command
     }
 
     /**
-     * Cek status dengan nomor referensi yang tidak pernah dibuat (tidak disimpan ke database).
+     * Arahan YODU: originalReferenceNo = referenceNo dari Generate QR yang BELUM dibayar. Jadi QR dibuat dulu,
+     * lalu langsung dicek statusnya. QR uji tidak disimpan ke database (tidak terkait member mana pun).
      *
      * @return array<string, mixed>
      */
     private function statusNotFound(): array
     {
+        $generateBody = $this->qrBody();
+        $generated = $this->send(YoduGateway::PATH_GENERATE, $generateBody);
+        $referenceNo = is_array($generated['response']) ? ($generated['response']['referenceNo'] ?? null) : null;
+
+        if (! $referenceNo) {
+            return ['error' => 'Generate QR untuk 18.17 gagal ('.($generated['code'] ?? 'HTTP '.$generated['http']).' '
+                .($generated['message'] ?? '').'), jadi status tidak bisa dicek.'];
+        }
+
         $payment = (new Payment)->forceFill([
-            'merchant_ref' => YoduClient::uniqueRef('UJI-NOTFOUND-'),
-            'gateway_ref' => YoduClient::uniqueRef('ORD-TIDAK-ADA-'),
+            'merchant_ref' => $generateBody['partnerReferenceNo'],
+            'gateway_ref' => $referenceNo,
             'created_at' => now(),
         ]);
 
         return $this->send(YoduGateway::PATH_STATUS, $this->gateway->statusRequestBody($payment))
-            + ['note' => "Nomor referensi tidak pernah dibuat: {$payment->merchant_ref}."];
+            + ['note' => "QR dibuat lalu langsung dicek tanpa dibayar: partnerReferenceNo {$payment->merchant_ref}, "
+                ."referenceNo {$referenceNo} (dari respons Generate QR, {$generated['code']})."];
     }
 
     /** @param  array<string, mixed>  $result */
