@@ -17,8 +17,12 @@ use Throwable;
  * format template YODU, siap disalin ke xlsx.
  *
  *   18.1–18.7  dijalankan langsung (Generate QR + skenario error)
+ *   18.15/24   cek status transaksi yang sudah dibayar (Payment SUCCESS terakhir, atau --ref)
+ *   18.17      cek status nomor referensi yang tidak ada (Transaction Not Found)
  *   18.18/19   diambil dari log callback (payment_notifications): butuh notifikasi sukses / gagal dari sandbox
- *   18.24      cek status transaksi yang sudah dibayar (Payment SUCCESS terakhir, atau --ref)
+ *
+ * Query Payment (18.15/18.17) & Transaction Status Inquiry (18.24) memakai API Check Status YODU yang sama
+ * (YoduGateway::PATH_STATUS), satu-satunya API status di spec YODU.
  *
  * Hanya untuk sandbox: ditolak kalau YODU_BASE_URL bukan host sandbox. Laporan berisi header asli (termasuk
  * token & X-CLIENT-KEY sandbox, sesuai template YODU) dan disimpan di storage/app/private (tidak di-commit).
@@ -28,7 +32,7 @@ class YoduFunctionalTest extends Command
     protected $signature = 'yodu:uji-fungsional
         {--case=* : Nomor test case tertentu saja, mis. --case=18.1 --case=18.6}
         {--amount=10000 : Nominal Generate QR (rupiah)}
-        {--ref= : merchant_ref transaksi yang sudah dibayar untuk 18.24}';
+        {--ref= : merchant_ref transaksi yang sudah dibayar untuk 18.15 / 18.24}';
 
     protected $description = 'Jalankan uji fungsional YODU QRIS MPM ke sandbox dan tulis laporan siap-salin';
 
@@ -125,12 +129,16 @@ class YoduFunctionalTest extends Command
                     'merchantId tidak terdaftar' => fn () => $this->send($generate, ['merchantId' => '999999999'] + $this->qrBody()),
                     'merchantId + storeId tidak terdaftar' => fn () => $this->send($generate, ['merchantId' => '999999999', 'storeId' => '999999999000'] + $this->qrBody()),
                 ])],
+            '18.15' => ['Query Payment: Successful Transaction (00)', ['200xx00', 'Successful'],
+                fn () => $this->statusInquiry('18.15')],
+            '18.17' => ['Query Payment: Transaction Not Found', ['4045101', 'Transaction Not Found'],
+                fn () => $this->statusNotFound()],
             '18.18' => ['Payment Notification: Successful Transaction (00)', ['2005200', 'Successful'],
                 fn () => $this->callback('00')],
             '18.19' => ['Payment Notification: Failed Transaction (06)', ['2005200', 'Successful'],
                 fn () => $this->callback('06')],
             '18.24' => ['Transaction Status Inquiry: transaksi berhasil (00)', ['200xx00', 'Successful'],
-                fn () => $this->statusInquiry()],
+                fn () => $this->statusInquiry('18.24')],
         ];
     }
 
@@ -217,7 +225,7 @@ class YoduFunctionalTest extends Command
     }
 
     /** @return array<string, mixed> */
-    private function statusInquiry(): array
+    private function statusInquiry(string $case): array
     {
         $payment = Payment::query()
             ->where('gateway', 'yodu')
@@ -227,11 +235,31 @@ class YoduFunctionalTest extends Command
 
         if (! $payment) {
             return ['skipped' => 'Belum ada transaksi sandbox yang sudah dibayar. Bayar satu QR iuran di sandbox, '
-                .'lalu jalankan ulang: --case=18.24 (atau --ref=<merchant_ref>)'];
+                ."lalu jalankan ulang: --case={$case} (atau --ref=<merchant_ref>)"];
         }
 
+        $result = $this->send(YoduGateway::PATH_STATUS, $this->gateway->statusRequestBody($payment));
+        $response = is_array($result['response']) ? $result['response'] : [];
+        $txStatus = $response['responseData']['latestTransactionStatus'] ?? $response['latestTransactionStatus'] ?? '-';
+
+        return $result + ['note' => "Transaksi {$payment->merchant_ref}, latestTransactionStatus: {$txStatus}."];
+    }
+
+    /**
+     * Cek status dengan nomor referensi yang tidak pernah dibuat (tidak disimpan ke database).
+     *
+     * @return array<string, mixed>
+     */
+    private function statusNotFound(): array
+    {
+        $payment = (new Payment)->forceFill([
+            'merchant_ref' => YoduClient::uniqueRef('UJI-NOTFOUND-'),
+            'gateway_ref' => YoduClient::uniqueRef('ORD-TIDAK-ADA-'),
+            'created_at' => now(),
+        ]);
+
         return $this->send(YoduGateway::PATH_STATUS, $this->gateway->statusRequestBody($payment))
-            + ['note' => "Transaksi {$payment->merchant_ref}."];
+            + ['note' => "Nomor referensi tidak pernah dibuat: {$payment->merchant_ref}."];
     }
 
     /** @param  array<string, mixed>  $result */

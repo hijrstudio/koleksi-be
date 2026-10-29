@@ -98,6 +98,33 @@ test('the same X-EXTERNAL-ID is sent twice for 18.5', function () {
         ->and(ujiReport())->toContain('Hasil: SESUAI (responseCode 4094700)');
 });
 
+test('query payment cases check a paid transaction and an unknown reference', function () {
+    Payment::create([
+        'member_id' => Member::factory()->create()->id, 'gateway' => 'yodu', 'merchant_ref' => 'KLK0001-PAID',
+        'amount' => 10000, 'status' => Payment::SUCCESS, 'gateway_ref' => 'YODU-REF-1',
+    ]);
+    Http::fake(function (Request $request) {
+        if (str_ends_with($request->url(), '/access/token')) {
+            return Http::response(['responseCode' => '2007300', 'accessToken' => 'GOOD-TOKEN']);
+        }
+
+        return json_decode($request->body(), true)['originalPartnerReferenceNo'] === 'KLK0001-PAID'
+            ? Http::response(['responseCode' => '2008200', 'responseMessage' => 'Approved', 'latestTransactionStatus' => '00'])
+            : Http::response(['responseCode' => '4045101', 'responseMessage' => 'Transaction Not Found'], 404);
+    });
+
+    $this->artisan('yodu:uji-fungsional', ['--case' => ['18.15', '18.17']])->assertSuccessful();
+
+    expect(ujiReport())
+        ->toContain('## 18.15 Query Payment: Successful Transaction (00)')
+        ->toContain('Transaksi KLK0001-PAID, latestTransactionStatus: 00.')
+        ->toContain('## 18.17 Query Payment: Transaction Not Found')
+        ->toContain('Hasil: SESUAI (responseCode 4045101)')
+        ->not->toContain('TIDAK SESUAI');
+
+    expect(Payment::count())->toBe(1); // referensi palsu 18.17 tidak disimpan
+});
+
 test('a callback logged before replies were recorded is skipped, not failed', function () {
     PaymentNotification::create([
         'gateway' => 'yodu', 'gateway_status' => '00', 'accepted' => true,
@@ -133,7 +160,7 @@ test('callback and status cases use logged callbacks and the last paid transacti
         ->toContain('Hasil: SESUAI (responseCode 2005200)')
         ->toContain('"latestTransactionStatus": "00"')
         ->toContain('Hasil: DILEWATI')                    // 18.19: belum ada callback "06"
-        ->toContain('Transaksi KLK0001-PAID.')
+        ->toContain('Transaksi KLK0001-PAID, latestTransactionStatus: 00.')
         ->toContain('Hasil: SESUAI (responseCode 2005300)');
 
     Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/paystatus')
