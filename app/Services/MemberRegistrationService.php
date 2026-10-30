@@ -3,39 +3,37 @@
 namespace App\Services;
 
 use App\Models\Member;
-use App\Models\MemberVehicle;
 use App\Models\MemberVehicleDocument;
+use App\Models\Payment;
 use App\Models\User;
-use App\Notifications\MemberRegistrationApproved;
-use App\Notifications\MemberRegistrationRejected;
+use App\Notifications\MemberRegistrationActivated;
+use App\Notifications\MemberRegistrationPaymentLink;
 use App\Notifications\NewMemberRegistration;
 use App\Notifications\VerifyMemberRegistrationEmail;
-use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
-use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 /**
- * Alur pendaftaran member baru lewat website:
+ * Alur pendaftaran member baru lewat website (tanpa review pengurus):
  *
- *   register()     form /daftar          → members (unverified) + kendaraan & dokumen, kirim link verifikasi e-mail
- *   verifyEmail()  klik link di e-mail    → pending, kabari pengurus (lonceng CMS + e-mail)
- *   approve()      pengurus di CMS        → approved + No. lambung + tgl bergabung, e-mail "bayar iuran pertama"
- *   reject()       pengurus di CMS        → rejected + alasan, e-mail ke pendaftar
+ *   register()     form /daftar            → members (unverified) + kendaraan & dokumen, kirim link verifikasi e-mail
+ *   verifyEmail()  klik link di e-mail      → awaiting_payment + batas bayar; FE langsung membuka halaman bayar
+ *   (bayar)        halaman /daftar/bayar     → QRIS iuran pertama (Api\RegistrationPaymentController + PaymentService)
+ *   activate()     iuran pertama lunas       → approved: No. lambung (NoLambungAllocator), tgl bergabung, bisa login
  *
- * Setelah disetujui, member login dan membayar iuran lewat kartu iuran di dasbor (QRIS YODU) — sama dengan
- * daftar ulang: BillingResolver melihat paid_until kosong (state "unpaid") lalu menagih periode pertama,
- * PaymentService menandai lunas, MembershipService mengaktifkan member.
+ * Pendaftar unverified / awaiting_payment tidak bisa login dan tidak tampil di daftar member CMS. Yang tidak membayar
+ * sampai batasnya dihapus members:prune-registrations.
  */
 class MemberRegistrationService
 {
     public function __construct(
         private MemberProfileService $profiles,
         private MembershipService $membership,
+        private NoLambungAllocator $noLambung,
     ) {}
 
     /**
@@ -45,8 +43,8 @@ class MemberRegistrationService
     public function register(array $data, array $documents, ?string $ip): Member
     {
         $member = DB::transaction(function () use ($data, $documents, $ip) {
-            // Pendaftaran lama yang tidak diverifikasi / ditolak dengan e-mail, No. HP, atau kendaraan yang sama
-            // tidak boleh menghalangi pendaftaran baru → dihapus permanen beserta dokumennya.
+            // Pendaftaran lama (belum verifikasi / belum bayar / ditolak) dengan e-mail, No. HP, atau kendaraan yang
+            // sama tidak boleh menghalangi pendaftaran baru → dihapus permanen beserta dokumennya.
             $this->purgeStale($data);
 
             $member = new Member([
@@ -77,15 +75,23 @@ class MemberRegistrationService
     }
 
     /**
-     * Kirim ulang link verifikasi. Diam-diam tidak melakukan apa-apa kalau e-mail tidak terdaftar / sudah
-     * terverifikasi, supaya endpoint tidak bisa dipakai menebak e-mail yang terdaftar.
+     * Kirim ulang link: verifikasi (belum verifikasi) atau bayar (belum bayar, batas bayar diperpanjang).
+     * Diam-diam tidak melakukan apa-apa kalau e-mail tidak terdaftar / sudah aktif, supaya endpoint tidak bisa
+     * dipakai menebak e-mail yang terdaftar.
      */
-    public function resendVerification(string $email): void
+    public function resend(string $email): void
     {
         $member = Member::query()
-            ->registration(Member::REG_UNVERIFIED)
+            ->whereIn('registration_status', [Member::REG_UNVERIFIED, Member::REG_AWAITING_PAYMENT])
             ->where('email', $email)
             ->first();
+
+        if ($member?->isAwaitingPayment()) {
+            $member->forceFill(['payment_due_at' => $this->paymentDeadline()])->save();
+            $member->notify(new MemberRegistrationPaymentLink);
+
+            return;
+        }
 
         $member?->notify(new VerifyMemberRegistrationEmail);
     }
@@ -93,7 +99,8 @@ class MemberRegistrationService
     /**
      * Link verifikasi diklik (signature & masa berlaku sudah dicek controller).
      *
-     * @return 'verified'|'already'|'invalid'
+     * @return 'verified'|'already'|'active'|'invalid'
+     *                                                 verified/already → lanjut ke halaman bayar; active → sudah anggota, arahkan login
      */
     public function verifyEmail(Member $member, string $hash): string
     {
@@ -109,106 +116,71 @@ class MemberRegistrationService
 
             $member->forceFill([
                 'email_verified_at' => now(),
-                'registration_status' => Member::REG_PENDING,
+                'registration_status' => Member::REG_AWAITING_PAYMENT,
+                'payment_due_at' => $this->paymentDeadline(),
             ])->save();
 
             return $member;
         });
 
-        if (! $verified) {
-            // Klik ulang link yang sama setelah berhasil → tetap tampilkan sukses, bukan error
-            return in_array($member->refresh()->registration_status, [Member::REG_PENDING, Member::REG_APPROVED], true)
-                ? 'already'
-                : 'invalid';
+        if ($verified) {
+            return 'verified';
         }
 
-        $this->notifyAdmins($verified);
+        // Klik ulang link yang sama → tetap lanjut (halaman bayar / login), bukan error
+        return match ($member->refresh()->registration_status) {
+            Member::REG_AWAITING_PAYMENT => 'already',
+            Member::REG_APPROVED => 'active',
+            default => 'invalid',
+        };
+    }
 
-        return 'verified';
+    /** Halaman bayar iuran pendaftaran di FE, dengan token yang berlaku sampai batas bayar. */
+    public function paymentUrl(Member $member): string
+    {
+        $expires = $member->payment_due_at ?? $this->paymentDeadline();
+
+        return config('membership.registration.payment_url').'?'.http_build_query([
+            'token' => RegistrationPaymentToken::make($member, $expires),
+        ]);
     }
 
     /**
-     * Setujui pendaftaran: beri No. lambung berikutnya, tanggal bergabung = hari ini (patokan periode iuran),
-     * kendaraan & dokumen dianggap sudah diverifikasi saat review.
-     *
-     * @throws ValidationException
+     * Iuran pertama lunas → jadikan anggota resmi. Dipanggil PaymentService di DALAM transaksi pembayaran
+     * (setelah tagihan ditandai lunas, sebelum status keanggotaan dihitung ulang). Idempoten.
      */
-    public function approve(Member $member, User $admin): Member
+    public function activate(Member $member): bool
     {
-        // Kunci global supaya dua admin yang menyetujui bersamaan tidak mendapat No. lambung yang sama
-        // (kolom no_lambung juga unique di DB sebagai pengaman terakhir).
-        try {
-            $member = Cache::lock('members:assign-no-lambung', 10)->block(5, fn () => DB::transaction(function () use ($member, $admin) {
-                $member = $this->lockPending($member);
-
-                $member->forceFill([
-                    'no_lambung' => (int) Member::withTrashed()->max('no_lambung') + 1,
-                    'tgl_bergabung' => today(),
-                    'registration_status' => Member::REG_APPROVED,
-                    'reviewed_by' => $admin->id,
-                    'reviewed_at' => now(),
-                    'review_note' => null,
-                ])->save();
-
-                $member->vehicles()->where('verification_status', MemberVehicle::PENDING)->update([
-                    'verification_status' => MemberVehicle::VERIFIED,
-                    'verified_by' => $admin->id,
-                    'verified_at' => now(),
-                ]);
-
-                // Belum ada iuran lunas → tetap tidak aktif sampai iuran pertama dibayar
-                $this->membership->refreshStatus($member);
-                $member->statusLogs()->create([
-                    'from_status' => null,
-                    'to_status' => $member->status,
-                    'mode' => $member->status_mode,
-                    'reason' => 'Pendaftaran disetujui, menunggu pembayaran iuran pertama',
-                    'changed_by' => $admin->id,
-                ]);
-
-                return $member;
-            }));
-        } catch (LockTimeoutException) {
-            throw ValidationException::withMessages(['registration' => 'Sedang ada persetujuan lain yang diproses. Coba lagi.']);
+        $member = Member::query()->lockForUpdate()->find($member->id);
+        if (! $member?->isAwaitingPayment()) {
+            return false;
         }
 
-        $member->notify(new MemberRegistrationApproved);
+        // Tanggal bergabung = awal periode iuran pertama yang dibayar → periode tahunan cocok dengan tagihannya
+        $firstPeriod = $member->dues()->whereNotNull('paid_at')->min('period_start');
 
-        return $member;
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    public function reject(Member $member, User $admin, string $reason): Member
-    {
-        $member = DB::transaction(function () use ($member, $admin, $reason) {
-            $member = $this->lockPending($member);
-
+        $this->noLambung->assign(function (int $number) use ($member, $firstPeriod) {
             $member->forceFill([
-                'registration_status' => Member::REG_REJECTED,
-                'reviewed_by' => $admin->id,
-                'reviewed_at' => now(),
-                'review_note' => $reason,
+                'no_lambung' => $number,
+                'tgl_bergabung' => $firstPeriod ? Carbon::parse($firstPeriod) : today(),
+                'registration_status' => Member::REG_APPROVED,
+                'payment_due_at' => null,
             ])->save();
-
-            $member->vehicles()->where('verification_status', MemberVehicle::PENDING)->update([
-                'verification_status' => MemberVehicle::REJECTED,
-                'verified_by' => $admin->id,
-                'verified_at' => now(),
-                'rejection_reason' => $reason,
-            ]);
-
-            return $member;
         });
 
-        $member->notify(new MemberRegistrationRejected($reason));
+        $this->membership->renumberInvoices($member);
 
-        return $member;
+        DB::afterCommit(function () use ($member) {
+            $member->notify(new MemberRegistrationActivated);
+            $this->notifyAdmins($member);
+        });
+
+        return true;
     }
 
     /**
-     * Hapus permanen pendaftar (beserta file dokumen). Dipakai untuk pendaftaran usang & members:prune-registrations.
+     * Hapus permanen pendaftar (beserta file dokumen & riwayat QR yang belum dibayar).
+     * Dipakai untuk pendaftaran usang & members:prune-registrations.
      */
     public function purge(Member $member): void
     {
@@ -223,23 +195,35 @@ class MemberRegistrationService
         });
     }
 
-    /** Admin CMS yang boleh mereview pendaftaran. */
-    public function reviewers(): Collection
+    /**
+     * Pembayaran pendaftar yang masih bisa berubah jadi lunas (QR belum kedaluwarsa) atau sudah lunas —
+     * pendaftar seperti ini TIDAK boleh dihapus, supaya uang yang masuk tidak kehilangan pemiliknya.
+     */
+    public function hasPaymentInFlight(Member $member): bool
     {
-        $admins = User::role('super-admin')->get();
+        return $member->payments()
+            ->where(fn ($q) => $q->where('status', Payment::SUCCESS)
+                ->orWhere(fn ($q) => $q->where('status', Payment::PENDING)->where('expired_at', '>', now()->subMinutes(5))))
+            ->exists();
+    }
 
-        try {
-            $admins = $admins->merge(User::permission('members.review')->get());
-        } catch (PermissionDoesNotExist) {
-            // RoleSeeder belum dijalankan ulang → cukup super-admin
-        }
+    /** Admin CMS yang dikabari anggota baru: super-admin & yang boleh melihat daftar member. */
+    public function admins(): Collection
+    {
+        return User::role('super-admin')->get()
+            ->merge(User::permission('members.view')->get())
+            ->unique('id')
+            ->values();
+    }
 
-        return $admins->unique('id')->values();
+    public function paymentDeadline(): Carbon
+    {
+        return now()->addHours((int) config('membership.registration.payment_ttl_hours'));
     }
 
     private function notifyAdmins(Member $member): void
     {
-        Notification::send($this->reviewers(), new NewMemberRegistration($member));
+        Notification::send($this->admins(), new NewMemberRegistration($member));
 
         $emails = config('membership.registration.admin_emails');
         if ($emails !== []) {
@@ -247,35 +231,35 @@ class MemberRegistrationService
         }
     }
 
-    /** @throws ValidationException */
-    private function lockPending(Member $member): Member
-    {
-        $locked = Member::query()->lockForUpdate()->find($member->id);
-
-        if ($locked?->registration_status !== Member::REG_PENDING) {
-            throw ValidationException::withMessages([
-                'registration' => 'Pendaftaran ini sudah direview atau belum memverifikasi e-mail.',
-            ]);
-        }
-
-        return $locked;
-    }
-
-    /** @param  array<string, mixed>  $data */
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ValidationException
+     */
     private function purgeStale(array $data): void
     {
+        $plat = ($data['plat_kode'] ?? '').($data['plat_nomor'] ?? '').($data['plat_seri'] ?? '');
+
         $stale = Member::withTrashed()
             ->whereIn('registration_status', Member::REG_STALE)
-            ->where(function ($q) use ($data) {
+            ->where(function ($q) use ($data, $plat) {
                 $q->where('email', $data['email'])->orWhere('no_hp', $data['no_hp']);
 
                 if ($data['has_vehicle']) {
-                    $q->orWhereHas('vehicles', fn ($v) => $v->where('vin', $data['vin'])
-                        ->orWhere('plat_full', $data['plat_kode'].$data['plat_nomor'].($data['plat_seri'] ?? '')));
+                    $q->orWhereHas('vehicles', fn ($v) => $v->where('plat_full', $plat)
+                        ->when(filled($data['vin'] ?? null), fn ($v) => $v->orWhere('vin', $data['vin'])));
                 }
             })
             ->get();
 
-        $stale->each(fn (Member $m) => $this->purge($m));
+        foreach ($stale as $member) {
+            if ($member->isAwaitingPayment() && $this->hasPaymentInFlight($member)) {
+                throw ValidationException::withMessages([
+                    'email' => 'Pendaftaran dengan data ini sedang menunggu konfirmasi pembayaran. Coba lagi beberapa menit lagi.',
+                ]);
+            }
+
+            $this->purge($member);
+        }
     }
 }

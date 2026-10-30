@@ -18,8 +18,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * Pendaftaran member baru dari website.
  *   POST /api/v1/registrations                     (FE, FRONTEND_API_TOKEN) simpan pendaftaran
- *   POST /api/v1/registrations/resend-verification (FE, FRONTEND_API_TOKEN) kirim ulang link verifikasi
+ *   POST /api/v1/registrations/resend-verification (FE, FRONTEND_API_TOKEN) kirim ulang link verifikasi / link bayar
  *   GET  /api/v1/registrations/verify/{member}/{hash}?expires=&signature=   link di e-mail (dibuka browser)
+ *        → berhasil: langsung ke halaman bayar iuran pendaftaran (FE /daftar/bayar?token=...)
  */
 class MemberRegistrationController extends Controller
 {
@@ -44,7 +45,10 @@ class MemberRegistrationController extends Controller
         ], 201);
     }
 
-    /** Selalu 200 dengan pesan yang sama — tidak membocorkan apakah e-mail terdaftar. */
+    /**
+     * Kirim ulang link verifikasi (belum verifikasi) atau link bayar (belum bayar).
+     * Selalu 200 dengan pesan yang sama — tidak membocorkan apakah e-mail terdaftar.
+     */
     public function resendVerification(Request $request): JsonResponse
     {
         $email = Str::lower(trim((string) $request->validate([
@@ -60,16 +64,16 @@ class MemberRegistrationController extends Controller
         }
         RateLimiter::hit($key, 60);
 
-        $this->registrations->resendVerification($email);
+        $this->registrations->resend($email);
 
         return response()->json([
-            'message' => 'Kalau e-mail tersebut terdaftar dan belum diverifikasi, link verifikasi baru sudah dikirim.',
+            'message' => 'Kalau e-mail tersebut terdaftar dan pendaftarannya belum selesai, link baru sudah dikirim.',
         ]);
     }
 
     /**
-     * Link verifikasi di e-mail. Hasilnya tidak ditampilkan di sini, tapi diteruskan ke halaman FE:
-     * {verified_redirect}?status=verified|already|expired|invalid
+     * Link verifikasi di e-mail. Berhasil (atau diklik ulang sebelum bayar) → halaman bayar iuran pendaftaran di FE.
+     * Selain itu → {verified_redirect}?status=expired|invalid|active (active = sudah anggota, silakan masuk).
      */
     public function verify(Request $request, string $member, string $hash): RedirectResponse
     {
@@ -85,7 +89,10 @@ class MemberRegistrationController extends Controller
         }
 
         $found = ctype_digit($member) ? Member::query()->find((int) $member) : null;
+        $status = $found ? $this->registrations->verifyEmail($found, $hash) : 'invalid';
 
-        return $redirect($found ? $this->registrations->verifyEmail($found, $hash) : 'invalid');
+        return in_array($status, ['verified', 'already'], true)
+            ? redirect()->away($this->registrations->paymentUrl($found->refresh()))
+            : $redirect($status);
     }
 }

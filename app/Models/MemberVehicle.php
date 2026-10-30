@@ -37,9 +37,11 @@ class MemberVehicle extends Model
 
     protected static function booted(): void
     {
-        // Normalisasi otomatis: huruf besar, tanpa spasi
+        // Normalisasi otomatis: huruf besar, tanpa spasi. No. rangka opsional → kosong disimpan NULL
+        // (kolom UNIQUE: banyak NULL boleh, banyak '' tidak).
         static::saving(function (self $v) {
-            $v->vin = strtoupper(preg_replace('/\s+/', '', (string) $v->vin));
+            $vin = strtoupper(preg_replace('/\s+/', '', (string) $v->vin));
+            $v->vin = $vin === '' ? null : $vin;
             $v->plat_kode = strtoupper(trim((string) $v->plat_kode));
             $v->plat_nomor = trim((string) $v->plat_nomor);
             $v->plat_seri = $v->plat_seri ? strtoupper(trim($v->plat_seri)) : null;

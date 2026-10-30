@@ -42,7 +42,7 @@ class MemberEditProfileResource extends JsonResource
             'has_vehicle' => $this->has_vehicle,
             'vehicle' => $vehicle ? [
                 'id' => $vehicle->id,
-                'vin' => $vehicle->vin,
+                'vin' => $vehicle->vin ?? '',   // No. rangka opsional
                 'plat_kode' => $vehicle->plat_kode,
                 'plat_nomor' => $vehicle->plat_nomor,
                 'plat_seri' => $vehicle->plat_seri,

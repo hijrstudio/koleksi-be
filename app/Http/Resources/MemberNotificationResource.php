@@ -18,7 +18,7 @@ use Illuminate\Support\Arr;
  */
 class MemberNotificationResource extends JsonResource
 {
-    private const PARAMS = ['changed_at', 'amount', 'period_label', 'renewal_date', 'active_until', 'days_left'];
+    private const PARAMS = ['changed_at', 'amount', 'period_label', 'renewal_date', 'active_until', 'days_left', 'no_lambung'];
 
     /**
      * @return array<string, mixed>

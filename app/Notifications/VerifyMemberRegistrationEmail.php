@@ -35,7 +35,7 @@ class VerifyMemberRegistrationEmail extends Notification implements ShouldQueue
             ->greeting('Halo '.($notifiable->nama_panggilan ?: $notifiable->nama_lengkap).',')
             ->line('Terima kasih sudah mendaftar menjadi anggota KOLEKSI. Klik tombol di bawah untuk memverifikasi alamat e-mail Anda.')
             ->action('Verifikasi E-mail', self::verificationUrl($notifiable))
-            ->line("Link ini berlaku {$hours} jam. Setelah e-mail terverifikasi, pendaftaran Anda akan direview oleh pengurus.")
+            ->line("Link ini berlaku {$hours} jam. Setelah e-mail terverifikasi, Anda langsung diarahkan ke halaman pembayaran iuran pertama untuk mengaktifkan keanggotaan.")
             ->line('Kalau Anda tidak merasa mendaftar di KOLEKSI, abaikan e-mail ini.');
     }
 

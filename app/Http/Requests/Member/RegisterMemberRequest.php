@@ -17,8 +17,10 @@ use Illuminate\Validation\Validator;
  * Pendaftaran member baru dari form /daftar (multipart, ada upload dokumen kendaraan).
  * Dipanggil server Next.js (FRONTEND_API_TOKEN); IP pengunjung diteruskan lewat X-Forwarded-For.
  *
- * Keunikan e-mail / No. HP / VIN / plat mengabaikan pendaftaran usang (belum verifikasi / ditolak) —
+ * Keunikan e-mail / No. HP / VIN / plat mengabaikan pendaftaran usang (belum verifikasi / belum bayar / ditolak) —
  * baris itu dihapus oleh MemberRegistrationService saat pendaftaran baru disimpan.
+ *
+ * Kendaraan: wajib No. plat, merek, dan tipe; No. rangka (VIN) & dokumen bukti opsional.
  */
 class RegisterMemberRequest extends FormRequest
 {
@@ -74,17 +76,17 @@ class RegisterMemberRequest extends FormRequest
             'village_code' => ['nullable', 'string', Rule::exists('villages', 'code')->where('district_code', (string) $this->input('district_code'))],
 
             'has_vehicle' => ['required', 'boolean'],
-            'vin' => ['exclude_unless:has_vehicle,1,true', 'required', 'string', 'size:'.UpdateMemberProfileRequest::VIN_LENGTH, 'regex:/^[A-Z0-9]+$/'],
+            'vin' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'string', 'size:'.UpdateMemberProfileRequest::VIN_LENGTH, 'regex:/^[A-Z0-9]+$/'],
             'plat_kode' => ['exclude_unless:has_vehicle,1,true', 'required', 'regex:/^[A-Z]{1,2}$/'],
             'plat_nomor' => ['exclude_unless:has_vehicle,1,true', 'required', 'regex:/^\d{1,4}$/'],
             'plat_seri' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'regex:/^[A-Z]{1,3}$/'],
             'plat_status' => ['exclude_unless:has_vehicle,1,true', 'required', Rule::in(['permanen', 'sementara'])],
-            'vehicle_brand_id' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer',
+            'vehicle_brand_id' => ['exclude_unless:has_vehicle,1,true', 'required', 'integer',
                 Rule::exists('vehicle_brands', 'id')->where('is_active', true)],
-            'vehicle_model_id' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer',
+            'vehicle_model_id' => ['exclude_unless:has_vehicle,1,true', 'required', 'integer',
                 Rule::exists('vehicle_models', 'id')->where('is_active', true)->where('vehicle_brand_id', (int) $this->input('vehicle_brand_id'))],
             'tahun' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer', 'between:1990,'.(now()->year + 1)],
-            'documents' => ['exclude_unless:has_vehicle,1,true', 'required', 'array', 'min:1', 'max:'.UpdateMemberProfileRequest::MAX_DOCUMENTS],
+            'documents' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'array', 'max:'.UpdateMemberProfileRequest::MAX_DOCUMENTS],
             'documents.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:'.UpdateMemberProfileRequest::MAX_DOCUMENT_KB],
 
             'heard_from' => ['nullable', 'string', 'max:60'],
@@ -104,7 +106,7 @@ class RegisterMemberRequest extends FormRequest
                 ->whereHas('member', fn (Builder $q) => $q->withTrashed()->whereNotIn('registration_status', Member::REG_STALE))
                 ->exists();
 
-            if ($taken('vin', (string) $this->input('vin'))) {
+            if ($this->filled('vin') && $taken('vin', (string) $this->input('vin'))) {
                 $validator->errors()->add('vin', 'No. rangka sudah terdaftar atas kendaraan lain.');
             }
             if ($taken('plat_full', $this->input('plat_kode').$this->input('plat_nomor').$this->input('plat_seri'))) {
@@ -142,8 +144,6 @@ class RegisterMemberRequest extends FormRequest
             'plat_nomor.regex' => 'Nomor plat 1–4 angka.',
             'plat_seri.regex' => 'Huruf belakang plat 1–3 huruf.',
             'tahun.between' => 'Tahun harus antara 1990 dan '.(now()->year + 1).'.',
-            'documents.required' => 'Unggah minimal satu dokumen bukti (STNK, SPK, atau Invoice).',
-            'documents.min' => 'Unggah minimal satu dokumen bukti (STNK, SPK, atau Invoice).',
             'documents.max' => 'Maksimal '.UpdateMemberProfileRequest::MAX_DOCUMENTS.' dokumen.',
             'documents.*.mimes' => 'Dokumen harus berupa JPG, PNG, WEBP, atau PDF.',
             'documents.*.max' => 'Ukuran dokumen maksimal 10 MB.',

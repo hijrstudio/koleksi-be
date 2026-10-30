@@ -7,6 +7,7 @@ use App\Models\MemberDue;
 use App\Models\Payment;
 use App\Payments\Contracts\PaymentGateway;
 use App\Payments\Data\TxStatus;
+use App\Services\MemberRegistrationService;
 use App\Services\MembershipService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -22,6 +23,9 @@ use Throwable;
  *   refresh()  → cek status, maks 1x / 5 detik per transaksi   (polling FE & scheduler)
  *   apply()    → terapkan status dari callback / cek status: payments → member_dues → members
  *
+ * Dipakai anggota (dasbor) dan pendaftar baru yang belum membayar (halaman /daftar/bayar): iuran pertama yang lunas
+ * mengaktifkan pendaftar (MemberRegistrationService::activate, No. lambung diberikan saat itu).
+ *
  * Tiga jalur deteksi (callback, polling FE, scheduler payments:reconcile) → tidak ada pembayaran yang terlewat.
  */
 class PaymentService
@@ -36,6 +40,7 @@ class PaymentService
         private PaymentGateway $gateway,
         private BillingResolver $billing,
         private MembershipService $membership,
+        private MemberRegistrationService $registrations,
     ) {}
 
     /**
@@ -92,9 +97,11 @@ class PaymentService
             $payment = Payment::create([
                 'member_id' => $member->id,
                 'gateway' => $this->gateway->name(),
-                // unik global (YODU mensyaratkan unik per hari), maks 64: KLK0007-261012170105-A1B2C3
-                'merchant_ref' => sprintf('KLK%04d-%s-%s',
-                    $member->no_lambung, now('Asia/Jakarta')->format('ymdHis'), Str::upper(Str::random(6))),
+                // unik global (YODU mensyaratkan unik per hari), maks 64: KLK0007-261012170105-A1B2C3;
+                // pendaftar yang belum punya No. lambung memakai ID pendaftaran: KLKR00123-...
+                'merchant_ref' => sprintf('KLK%s-%s-%s',
+                    $member->no_lambung === null ? 'R'.str_pad((string) $member->id, 5, '0', STR_PAD_LEFT) : sprintf('%04d', $member->no_lambung),
+                    now('Asia/Jakarta')->format('ymdHis'), Str::upper(Str::random(6))),
                 'amount' => $amount,
                 'status' => Payment::PENDING,
             ]);
@@ -289,6 +296,12 @@ class PaymentService
             /** @var MemberDue $due */
             $due = $item->due;
             $due && $this->membership->markPaid($due, 'online', $payment->paid_at, null, 'QRIS '.$payment->merchant_ref);
+        }
+
+        // Pendaftar baru: iuran pertama lunas → anggota resmi (No. lambung, tgl bergabung, bisa login)
+        if ($payment->member->isAwaitingPayment()) {
+            $this->registrations->activate($payment->member);
+            $payment->member->refresh();
         }
 
         $this->membership->refreshStatus($payment->member, null, null, 'Iuran lunas via QRIS '.$payment->merchant_ref);

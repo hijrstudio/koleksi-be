@@ -59,10 +59,33 @@ class MembershipService
             ]);
     }
 
-    /** Contoh: IUR-2627-0007 (periode 2026-2027, lambung #7). */
+    /**
+     * Contoh: IUR-2627-0007 (periode 2026-2027, lambung #7). Pendaftar yang belum punya No. lambung (belum bayar)
+     * memakai ID pendaftaran: IUR-2627-R00123 — diganti ke format lambung lewat renumberInvoices() saat aktif.
+     */
     public function invoiceNumber(Member $member, MembershipTerm $term): string
     {
-        return sprintf('IUR-%02d%02d-%04d', $term->start->year % 100, ($term->start->year + 1) % 100, $member->no_lambung);
+        return self::invoiceNumberFor($member, $term->start);
+    }
+
+    /** Samakan nomor invoice semua tagihan member dengan No. lambung-nya (setelah aktivasi / No. lambung diubah). */
+    public function renumberInvoices(Member $member): void
+    {
+        $member->dues()->get(['id', 'period_start', 'invoice_number'])->each(function (MemberDue $due) use ($member) {
+            $number = self::invoiceNumberFor($member, $due->period_start);
+            if ($due->invoice_number !== $number) {
+                $due->forceFill(['invoice_number' => $number])->save();
+            }
+        });
+    }
+
+    private static function invoiceNumberFor(Member $member, Carbon $periodStart): string
+    {
+        $owner = $member->no_lambung === null
+            ? 'R'.str_pad((string) $member->id, 5, '0', STR_PAD_LEFT)
+            : sprintf('%04d', $member->no_lambung);
+
+        return sprintf('IUR-%02d%02d-%s', $periodStart->year % 100, ($periodStart->year + 1) % 100, $owner);
     }
 
     /** Tandai lunas (dipakai import kalau kolom iuran di Excel terisi). */

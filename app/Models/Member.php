@@ -38,19 +38,30 @@ class Member extends Authenticatable
     /** Status ditetapkan admin CMS */
     public const MODE_MANUAL = 'manual';
 
-    /** Pendaftaran lewat website (lihat App\Services\MemberRegistrationService). */
-    public const REG_UNVERIFIED = 'unverified';   // e-mail belum diverifikasi
+    /**
+     * Pendaftaran lewat website (lihat App\Services\MemberRegistrationService):
+     * unverified → (klik link e-mail) awaiting_payment → (iuran pertama lunas) approved.
+     */
+    public const REG_UNVERIFIED = 'unverified';             // e-mail belum diverifikasi
 
-    public const REG_PENDING = 'pending';         // menunggu review pengurus
+    public const REG_AWAITING_PAYMENT = 'awaiting_payment'; // e-mail terverifikasi, iuran pertama belum dibayar
 
-    public const REG_APPROVED = 'approved';       // anggota resmi (default data lama / import)
+    public const REG_APPROVED = 'approved';                 // anggota resmi (sudah bayar, data lama / import)
+
+    /** Alur lama (review pengurus) — tidak dipakai pendaftaran baru, tetap dikenali untuk data yang sudah ada. */
+    public const REG_PENDING = 'pending';
 
     public const REG_REJECTED = 'rejected';
 
-    public const REGISTRATION_STATUSES = [self::REG_UNVERIFIED, self::REG_PENDING, self::REG_APPROVED, self::REG_REJECTED];
+    public const REGISTRATION_STATUSES = [
+        self::REG_UNVERIFIED, self::REG_AWAITING_PAYMENT, self::REG_APPROVED, self::REG_PENDING, self::REG_REJECTED,
+    ];
 
-    /** Pendaftaran yang boleh "ditimpa" pendaftaran baru dengan e-mail / No. HP / kendaraan yang sama. */
-    public const REG_STALE = [self::REG_UNVERIFIED, self::REG_REJECTED];
+    /**
+     * Pendaftaran yang boleh "ditimpa" pendaftaran baru dengan e-mail / No. HP / kendaraan yang sama.
+     * awaiting_payment hanya kalau tidak ada pembayaran yang sedang berjalan (dicek MemberRegistrationService).
+     */
+    public const REG_STALE = [self::REG_UNVERIFIED, self::REG_AWAITING_PAYMENT, self::REG_REJECTED];
 
     /**
      * status / status_mode / active_until sengaja tidak fillable: hanya diubah lewat MembershipService.
@@ -78,6 +89,7 @@ class Member extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'registered_at' => 'datetime',
+            'payment_due_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'password' => 'hashed',
         ];
@@ -194,9 +206,9 @@ class Member extends Authenticatable
         return $this->registration_status === self::REG_APPROVED;
     }
 
-    public function isAwaitingReview(): bool
+    public function isAwaitingPayment(): bool
     {
-        return $this->registration_status === self::REG_PENDING;
+        return $this->registration_status === self::REG_AWAITING_PAYMENT;
     }
 
     public function isManualStatus(): bool
@@ -204,13 +216,13 @@ class Member extends Authenticatable
         return $this->status_mode === self::MODE_MANUAL;
     }
 
-    /** "#007"; "—" untuk pendaftar yang belum disetujui (belum punya no. lambung). */
+    /** "#007"; "—" untuk pendaftar yang belum membayar (belum punya no. lambung). */
     public function noLambungLabel(): string
     {
         return $this->no_lambung === null ? '—' : '#'.str_pad((string) $this->no_lambung, 3, '0', STR_PAD_LEFT);
     }
 
-    /** Anggota resmi — pendaftar yang belum/tidak disetujui tidak ikut daftar member, login, dsb. */
+    /** Anggota resmi — pendaftar yang belum membayar tidak ikut daftar member, login, dsb. */
     public function scopeRegistered(Builder $q): void
     {
         $q->where('registration_status', self::REG_APPROVED);

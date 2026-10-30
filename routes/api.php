@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\MemberRegistrationController;
 use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\RegionController;
+use App\Http\Controllers\Api\RegistrationPaymentController;
 use App\Http\Controllers\Api\SpkluOperatorController;
 use App\Http\Controllers\Api\SponsorController;
 use App\Http\Controllers\Api\VehicleBrandController;
@@ -121,6 +122,7 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
 /*
 | Pendaftaran member baru (form /daftar). Store & resend dipanggil server Next.js (FRONTEND_API_TOKEN) yang meneruskan
 | IP pengunjung lewat X-Forwarded-For → throttle per pengunjung. Link verifikasi dibuka langsung dari e-mail (signed URL).
+| Halaman bayar iuran pendaftaran (/daftar/bayar) memakai token dari link e-mail (RegistrationPaymentController).
 */
 Route::prefix('v1/registrations')->name('api.v1.registrations.')->controller(MemberRegistrationController::class)->group(function () {
     Route::post('/', 'store')->middleware(['frontend.token', 'throttle:member-registration'])->name('store');
@@ -130,6 +132,14 @@ Route::prefix('v1/registrations')->name('api.v1.registrations.')->controller(Mem
         ->where(['member' => '\d+', 'hash' => '[a-f0-9]{40}'])
         ->middleware('throttle:30,1')->name('verify');
 });
+
+Route::prefix('v1/registrations/payment')->name('api.v1.registrations.payment.')
+    ->middleware('frontend.token')
+    ->controller(RegistrationPaymentController::class)->group(function () {
+        Route::post('/', 'show')->middleware('throttle:registration-payment-status')->name('show');
+        Route::post('/checkout', 'checkout')->middleware('throttle:registration-payment-create')->name('checkout');
+        Route::post('/status', 'status')->middleware('throttle:registration-payment-status')->name('status');
+    });
 
 /*
 | Auth member (login dari FE). Login dipanggil server Next.js → wajib FRONTEND_API_TOKEN; Next.js meneruskan IP

@@ -48,8 +48,8 @@ return [
     'password_reset_url' => env('MEMBER_PASSWORD_RESET_URL', env('FRONTEND_URL', 'http://localhost:3000').'/lupa-password/atur-ulang'),
 
     /*
-    | Pendaftaran member baru lewat website (form /daftar di FE):
-    |   daftar → verifikasi e-mail → review pengurus di CMS → disetujui → bayar iuran pertama (QRIS) → aktif.
+    | Pendaftaran member baru lewat website (form /daftar di FE), tanpa review pengurus:
+    |   daftar → verifikasi e-mail → bayar iuran pertama (QRIS, halaman /daftar/bayar) → aktif + No. lambung.
     */
     'registration' => [
         // Masa berlaku link verifikasi e-mail (menit)
@@ -58,13 +58,20 @@ return [
         // Pendaftar yang tidak memverifikasi e-mail dihapus otomatis setelah N hari (members:prune-registrations)
         'unverified_ttl_days' => (int) env('MEMBER_REGISTRATION_UNVERIFIED_DAYS', 7),
 
-        // Halaman FE tujuan setelah link verifikasi diklik (?status=verified|already|expired|invalid)
+        // Batas bayar iuran pertama setelah e-mail diverifikasi (jam) = masa berlaku link bayar. Lewat batas tanpa
+        // pembayaran → pendaftaran dihapus (members:prune-registrations). Kirim ulang link memperpanjang batas.
+        'payment_ttl_hours' => (int) env('MEMBER_REGISTRATION_PAYMENT_TTL_HOURS', 24),
+
+        // Halaman FE tujuan setelah link verifikasi diklik kalau tidak lanjut ke pembayaran (?status=expired|invalid|active)
         'verified_redirect' => env('MEMBER_REGISTRATION_VERIFIED_URL', env('FRONTEND_URL', 'http://localhost:3000').'/daftar/verifikasi'),
 
-        // Halaman login FE (tombol di e-mail persetujuan) — setelah login member diarahkan ke dasbor untuk bayar iuran
+        // Halaman bayar iuran pendaftaran di FE (?token=...)
+        'payment_url' => env('MEMBER_REGISTRATION_PAYMENT_URL', env('FRONTEND_URL', 'http://localhost:3000').'/daftar/bayar'),
+
+        // Halaman login FE (tombol di e-mail "akun aktif")
         'login_url' => env('MEMBER_LOGIN_URL', env('FRONTEND_URL', 'http://localhost:3000').'/masuk?next=%2Fdasbor'),
 
-        // E-mail tambahan yang menerima pemberitahuan pendaftar baru (selain admin CMS), pisahkan dengan koma
+        // E-mail tambahan yang menerima pemberitahuan anggota baru (selain admin CMS), pisahkan dengan koma
         'admin_emails' => array_values(array_filter(array_map('trim', explode(',', (string) env('MEMBER_REGISTRATION_ADMIN_EMAILS', ''))))),
     ],
 ];

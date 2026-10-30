@@ -85,12 +85,13 @@ class MemberLoginRequest extends FormRequest
         RateLimiter::clear($this->ipThrottleKey());
         RateLimiter::clear($this->accountThrottleKey());
 
-        // Pendaftar yang belum disetujui belum boleh masuk. Pesan spesifik hanya setelah kata sandi benar,
-        // jadi tidak membocorkan status pendaftaran ke orang lain.
+        // Pendaftar yang belum membayar iuran pertama belum boleh masuk. Pesan spesifik hanya setelah kata sandi
+        // benar, jadi tidak membocorkan status pendaftaran ke orang lain.
         if (! $member->isRegistrationApproved()) {
             throw ValidationException::withMessages(['identifier' => match ($member->registration_status) {
                 Member::REG_UNVERIFIED => 'E-mail Anda belum diverifikasi. Cek kotak masuk e-mail untuk link verifikasi.',
-                Member::REG_PENDING => 'Pendaftaran Anda sedang direview pengurus. Kami akan mengabari lewat e-mail.',
+                Member::REG_AWAITING_PAYMENT => 'Selesaikan pembayaran iuran pendaftaran untuk mengaktifkan akun. Link pembayaran ada di e-mail Anda (bisa dikirim ulang dari halaman daftar).',
+                Member::REG_PENDING => 'Pendaftaran Anda sedang diproses pengurus. Kami akan mengabari lewat e-mail.',
                 default => 'Pendaftaran Anda belum dapat disetujui. Silakan hubungi pengurus KOLEKSI.',
             }]);
         }

@@ -76,7 +76,9 @@ class UpdateMemberProfileRequest extends FormRequest
             'has_vehicle' => ['required', 'boolean'],
 
             // Kendaraan — hanya divalidasi (dan disimpan) kalau has_vehicle = ya
-            'vin' => ['exclude_unless:has_vehicle,1,true', 'required', 'string', 'size:'.self::VIN_LENGTH, 'regex:/^[A-Z0-9]+$/',
+            // No. rangka & dokumen bukti opsional; merek/tipe tetap opsional di sini supaya kendaraan hasil import
+            // (belum ada di katalog) tetap bisa disimpan — wajib di pendaftaran baru (RegisterMemberRequest).
+            'vin' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'string', 'size:'.self::VIN_LENGTH, 'regex:/^[A-Z0-9]+$/',
                 Rule::unique('member_vehicles', 'vin')->ignore($vehicleId)],
             'plat_kode' => ['exclude_unless:has_vehicle,1,true', 'required', 'regex:/^[A-Z]{1,2}$/'],
             'plat_nomor' => ['exclude_unless:has_vehicle,1,true', 'required', 'regex:/^\d{1,4}$/'],
@@ -114,14 +116,6 @@ class UpdateMemberProfileRequest extends FormRequest
                 ->exists();
             if ($taken) {
                 $validator->errors()->add('plat_nomor', 'No. plat sudah terdaftar atas kendaraan lain.');
-            }
-
-            // Minimal 1 dokumen bukti setelah penghapusan & upload baru
-            $remaining = $vehicle
-                ? $vehicle->documents()->whereNotIn('id', $this->removeDocumentIds())->count()
-                : 0;
-            if ($remaining + count($this->file('documents', [])) === 0) {
-                $validator->errors()->add('documents', 'Unggah minimal satu dokumen bukti (STNK, SPK, atau Invoice).');
             }
         }];
     }

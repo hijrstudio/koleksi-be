@@ -11,7 +11,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Ke pengurus (admin CMS): ada pendaftar baru yang e-mailnya sudah terverifikasi dan menunggu review.
+ * Ke pengurus (admin CMS): ada anggota baru yang mendaftar lewat website dan sudah membayar iuran pertama.
  * Admin CMS → lonceng notifikasi CMS + e-mail; alamat di membership.registration.admin_emails → e-mail saja.
  */
 class NewMemberRegistration extends Notification implements ShouldQueue
@@ -34,15 +34,16 @@ class NewMemberRegistration extends Notification implements ShouldQueue
         $vehicle = $m->primaryVehicle();
 
         return (new MailMessage)
-            ->subject('Pendaftar baru menunggu review: '.$m->nama_lengkap)
+            ->subject('Anggota baru: '.$m->nama_lengkap.' ('.$m->noLambungLabel().')')
             ->greeting('Halo Pengurus KOLEKSI,')
-            ->line('Ada pendaftar baru yang sudah memverifikasi e-mail dan menunggu review:')
+            ->line('Ada anggota baru yang mendaftar lewat website dan sudah membayar iuran pertama:')
+            ->line('No. lambung: '.$m->noLambungLabel())
             ->line('Nama: '.$m->nama_lengkap)
             ->line('E-mail: '.$m->email)
             ->line('No. HP: '.$m->no_hp)
             ->line('Kendaraan: '.($vehicle ? trim($vehicle->plat_display.' '.$vehicle->displayName()) : 'Tidak memiliki kendaraan'))
-            ->action('Review Pendaftaran', route('member-registrations.show', $m))
-            ->line('Setelah disetujui, pendaftar akan menerima e-mail untuk membayar iuran pertama.');
+            ->action('Lihat Anggota', route('members.show', $m))
+            ->line('Data kendaraan & dokumen (kalau ada) bisa diperiksa di halaman detail anggota.');
     }
 
     /**
@@ -51,11 +52,11 @@ class NewMemberRegistration extends Notification implements ShouldQueue
     public function toArray(User $notifiable): array
     {
         return [
-            'type' => 'member.registration_pending',
-            'title' => 'Pendaftar baru',
-            'message' => $this->member->nama_lengkap.' menunggu review pendaftaran.',
+            'type' => 'member.registration_activated',
+            'title' => 'Anggota baru',
+            'message' => $this->member->nama_lengkap.' ('.$this->member->noLambungLabel().') bergabung dan sudah membayar iuran.',
             'member_id' => $this->member->id,
-            'action_url' => route('member-registrations.show', $this->member),
+            'action_url' => route('members.show', $this->member),
         ];
     }
 }

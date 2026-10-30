@@ -72,6 +72,17 @@ class AppServiceProvider extends ServiceProvider
         ]);
         RateLimiter::for('member-registration-resend', fn (Request $request) => Limit::perHour(10)
             ->by('member-registration-resend:'.$request->ip()));
+        // Halaman bayar iuran pendaftaran (belum login): per pendaftar (ID di token) DAN per IP, supaya satu pendaftar
+        // tidak menghabiskan kuota IP bersama (kantor / NAT) dan satu IP tidak bisa mencoba banyak token.
+        $registrant = fn (Request $request) => strtok((string) $request->input('token'), '.') ?: 'x';
+        RateLimiter::for('registration-payment-create', fn (Request $request) => [
+            Limit::perMinute(10)->by('registration-payment-create:m:'.$registrant($request)),
+            Limit::perMinute(30)->by('registration-payment-create:ip:'.$request->ip()),
+        ]);
+        RateLimiter::for('registration-payment-status', fn (Request $request) => [
+            Limit::perMinute(60)->by('registration-payment-status:m:'.$registrant($request)),
+            Limit::perMinute(240)->by('registration-payment-status:ip:'.$request->ip()),
+        ]);
         // Lupa kata sandi (publik, per IP pengunjung yang diteruskan FE). Batas per e-mail ada di controller.
         RateLimiter::for('member-password-reset', fn (Request $request) => [
             Limit::perMinute(10)->by('member-password-reset:m:'.$request->ip()),

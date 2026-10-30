@@ -23,10 +23,11 @@ Schedule::command('members:send-renewal-reminders')
     ->onOneServer();
 
 /*
-| Pendaftar yang tidak memverifikasi e-mail — hapus beserta dokumennya.
+| Pendaftar yang tidak memverifikasi e-mail / tidak membayar iuran pertama sampai batasnya — hapus beserta
+| dokumennya. Tiap jam, karena batas bayar hanya 1 hari.
 */
 Schedule::command('members:prune-registrations')
-    ->dailyAt('01:30')
+    ->hourlyAt(30)
     ->withoutOverlapping()
     ->onOneServer();
 
