@@ -22,15 +22,21 @@ class MemberPolicy
         return $user->can('members.update-status');
     }
 
-    /** Lihat antrian & detail pendaftaran baru, beserta dokumennya. */
-    public function viewRegistrations(User $user): bool
+    /** Edit data member (No. lambung). */
+    public function update(User $user, Member $member): bool
     {
-        return $user->can('members.review') || $user->can('members.view');
+        return $user->can('members.update');
     }
 
-    /** Setujui / tolak pendaftaran. */
-    public function review(User $user, Member $member): bool
+    /** Hapus member (soft delete). */
+    public function delete(User $user, Member $member): bool
     {
-        return $user->can('members.review');
+        return $user->can('members.delete');
+    }
+
+    /** Pengaturan pendaftaran anggota baru (nomor awal No. lambung). */
+    public function updateSettings(User $user): bool
+    {
+        return $user->can('members.update');
     }
 }

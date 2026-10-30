@@ -81,8 +81,15 @@ export function initMembersTable() {
                 data: 'show_url',
                 orderable: false,
                 searchable: false,
-                className: 'dt-right',
-                render: (v) => `<a href="${escapeHtml(v)}" class="dt-btn">Detail</a>`,
+                className: 'dt-right dt-nowrap',
+                // Edit / Hapus hanya muncul kalau admin berhak (URL dikirim server sesuai permission)
+                render: (v, type, row) =>
+                    `<a href="${escapeHtml(v)}" class="dt-btn">Detail</a>` +
+                    (row.edit_url ? ` <a href="${escapeHtml(row.edit_url)}" class="dt-btn">Edit</a>` : '') +
+                    (row.delete_url
+                        ? ` <button type="button" class="dt-btn dt-btn-danger" data-member-delete="${escapeHtml(row.delete_url)}"` +
+                          ` data-member-name="${escapeHtml(`${row.nama_lengkap} (${row.no_lambung})`)}">Hapus</button>`
+                        : ''),
             },
         ],
         order: [[0, 'asc']],
@@ -118,6 +125,18 @@ export function initMembersTable() {
             Object.entries(filters).forEach(([key, select]) => (select.value = filter[key] ?? ''));
             table.search('').page(0).ajax.reload();
         });
+    });
+
+    // Hapus member: konfirmasi, lalu kirim form tersembunyi (CSRF + DELETE) ke URL baris tsb
+    el.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-member-delete]');
+        const form = document.querySelector('#memberDeleteForm');
+        if (!button || !form) return;
+
+        if (window.confirm(`Hapus member ${button.dataset.memberName}?\n\nMember tidak bisa login lagi dan hilang dari daftar. Riwayat iuran tetap tersimpan, No. lambungnya tidak dipakai ulang.`)) {
+            form.action = button.dataset.memberDelete;
+            form.submit();
+        }
     });
 
     document.querySelector('#resetMemberFilters')?.addEventListener('click', () => {

@@ -31,12 +31,31 @@
 @section('content')
     <x-common.page-breadcrumb pageTitle="Detail Member" />
 
-    <div class="mb-4">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         {{-- Halaman, pencarian & filter list dipulihkan otomatis oleh DataTables (stateSave) --}}
         <a href="{{ route('members.index') }}"
             class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
             ← Kembali ke daftar member
         </a>
+        <div class="flex items-center gap-2">
+            @can('update', $member)
+                <a href="{{ route('members.edit', $member) }}"
+                    class="rounded-lg border border-gray-300 px-3 py-1.5 text-theme-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]">
+                    Edit No. Lambung
+                </a>
+            @endcan
+            @can('delete', $member)
+                <form method="POST" action="{{ route('members.destroy', $member) }}"
+                    x-data @submit.prevent="if (confirm('Hapus member {{ e($member->nama_lengkap) }} ({{ $member->noLambungLabel() }})?\n\nMember tidak bisa login lagi dan hilang dari daftar. Riwayat iuran tetap tersimpan, No. lambungnya tidak dipakai ulang.')) $el.submit()">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit"
+                        class="border-error-300 text-error-600 hover:bg-error-50 dark:border-error-500/40 dark:text-error-500 dark:hover:bg-error-500/10 rounded-lg border px-3 py-1.5 text-theme-sm font-medium">
+                        Hapus Member
+                    </button>
+                </form>
+            @endcan
+        </div>
     </div>
 
     @if (session('success'))
@@ -270,7 +289,7 @@
                 <table class="min-w-full">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800">
-                            @foreach (['No. Plat', 'Kendaraan', 'Tahun', 'Warna', 'VIN', 'Verifikasi'] as $heading)
+                            @foreach (['No. Plat', 'Kendaraan', 'Tahun', 'Warna', 'VIN', 'Dokumen', 'Verifikasi'] as $heading)
                                 <th class="whitespace-nowrap px-5 py-3 text-left text-theme-xs font-medium text-gray-500 dark:text-gray-400">{{ $heading }}</th>
                             @endforeach
                         </tr>
@@ -287,12 +306,20 @@
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->displayName() ?: '—' }}</td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->tahun ?? '—' }}</td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->warna ?? '—' }}</td>
-                                <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->vin }}</td>
+                                <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->vin ?? '—' }}</td>
+                                <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">
+                                    @forelse ($vehicle->documents as $document)
+                                        <a href="{{ route('member-documents.show', $document) }}" target="_blank" rel="noopener"
+                                            class="text-brand-500 block whitespace-nowrap hover:underline">{{ strtoupper($document->type) }} · {{ \Illuminate\Support\Str::limit($document->original_name, 24) }}</a>
+                                    @empty
+                                        —
+                                    @endforelse
+                                </td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ ucfirst($vehicle->verification_status) }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-5 py-6 text-center text-theme-sm text-gray-500 dark:text-gray-400">
+                                <td colspan="7" class="px-5 py-6 text-center text-theme-sm text-gray-500 dark:text-gray-400">
                                     Member belum menambahkan kendaraan.
                                 </td>
                             </tr>

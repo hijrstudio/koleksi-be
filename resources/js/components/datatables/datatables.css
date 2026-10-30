@@ -243,6 +243,24 @@ table.dataTable td.dt-empty {
     background: rgb(255 255 255 / 0.03);
 }
 
+button.dt-btn {
+    background: transparent;
+    cursor: pointer;
+}
+
+.dt-btn-danger {
+    border-color: var(--color-error-300, #fda29b);
+    color: var(--color-error-600, #d92d20);
+}
+
+.dt-btn-danger:hover {
+    background: var(--color-error-50, #fef3f2);
+}
+
+.dark .dt-btn-danger {
+    color: var(--color-error-500, #f04438);
+}
+
 /* ---------- Info & pagination ---------- */
 .dt-container .dt-info {
     padding: 0 !important;

@@ -5,13 +5,19 @@ namespace App\Http\Controllers\Cms;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cms\UpdateMemberStatusRequest;
 use App\Models\Member;
+use App\Models\MemberVehicleDocument;
+use App\Models\Setting;
 use App\Services\MembershipService;
+use App\Services\NoLambungAllocator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberController extends Controller
 {
@@ -29,7 +35,10 @@ class MemberController extends Controller
 
     private const PAGE_LENGTHS = [10, 25, 50, 100];
 
-    public function index(): View
+    /** Batas atas No. lambung yang bisa diisi admin (cukup untuk 5 digit). */
+    public const MAX_NO_LAMBUNG = 99999;
+
+    public function index(NoLambungAllocator $noLambung): View
     {
         Gate::authorize('viewAny', Member::class);
 
@@ -37,6 +46,9 @@ class MemberController extends Controller
             'title' => 'Daftar Member',
             'summary' => $this->summary(),
             'pageLengths' => self::PAGE_LENGTHS,
+            'noLambungStart' => Setting::get(Setting::NO_LAMBUNG_START),
+            'nextNoLambung' => $noLambung->next(),
+            'highestNoLambung' => $noLambung->highest(),
         ]);
     }
 
@@ -98,6 +110,8 @@ class MemberController extends Controller
                 'renewal_days_left' => $m->daysUntilRenewal(),
                 'active_until' => $m->active_until?->translatedFormat('d M Y'),
                 'show_url' => route('members.show', $m),
+                'edit_url' => $request->user()->can('update', $m) ? route('members.edit', $m) : null,
+                'delete_url' => $request->user()->can('delete', $m) ? route('members.destroy', $m) : null,
             ]),
         ]);
     }
@@ -106,14 +120,13 @@ class MemberController extends Controller
     {
         Gate::authorize('view', $member);
 
-        // Pendaftar yang belum disetujui dilihat di halaman review pendaftaran
-        if (! $member->isRegistrationApproved()) {
-            return redirect()->route('member-registrations.show', $member);
-        }
+        // Pendaftar yang belum membayar iuran pertama bukan anggota (tidak tampil di CMS)
+        abort_unless($member->isRegistrationApproved(), 404);
 
         $member->load([
             'vehicles.brand:id,name',
             'vehicles.vehicleModel:id,name',
+            'vehicles.documents:id,member_vehicle_id,type,original_name',
             // Riwayat iuran mulai tahun pemutihan (mis. 2026-2027); periode sebelumnya tidak ditampilkan
             'dues' => fn ($q) => $q->with('recorder:id,name')
                 ->when($membership->arrearsCutoffYear(), fn ($q, int $year) => $q->whereYear('period_start', '>=', $year))
@@ -142,6 +155,106 @@ class MemberController extends Controller
         }
 
         return redirect()->route('members.show', $member)->with('success', 'Status member berhasil diperbarui.');
+    }
+
+    public function edit(Member $member, NoLambungAllocator $noLambung): View
+    {
+        Gate::authorize('update', $member);
+        abort_unless($member->isRegistrationApproved(), 404);
+
+        return view('pages.cms.members.edit', [
+            'title' => 'Edit Member',
+            'member' => $member,
+            'nextNoLambung' => $noLambung->next(),
+        ]);
+    }
+
+    /**
+     * Ubah No. lambung. Ditolak kalau sudah dipakai anggota lain (termasuk yang dihapus); nomor invoice iuran
+     * member ikut disesuaikan.
+     */
+    public function update(Request $request, Member $member, NoLambungAllocator $noLambung, MembershipService $membership): RedirectResponse
+    {
+        Gate::authorize('update', $member);
+        abort_unless($member->isRegistrationApproved(), 404);
+
+        $number = (int) $request->validate([
+            'no_lambung' => ['required', 'integer', 'min:1', 'max:'.self::MAX_NO_LAMBUNG],
+        ], [], ['no_lambung' => 'No. lambung'])['no_lambung'];
+
+        if ($number === $member->no_lambung) {
+            return redirect()->route('members.show', $member)->with('success', 'No. lambung tidak berubah.');
+        }
+
+        $old = $member->noLambungLabel();
+        $noLambung->change($member, $number, fn () => DB::transaction(function () use ($member, $number, $membership, $old, $request) {
+            $member->forceFill(['no_lambung' => $number])->save();
+            $membership->renumberInvoices($member);
+            $member->statusLogs()->create([
+                'from_status' => $member->status,
+                'to_status' => $member->status,
+                'mode' => $member->status_mode,
+                'reason' => "No. lambung diubah dari {$old} menjadi {$member->noLambungLabel()}",
+                'changed_by' => $request->user()->id,
+            ]);
+        }));
+
+        return redirect()->route('members.show', $member)->with('success', "No. lambung diubah menjadi {$member->noLambungLabel()}.");
+    }
+
+    /**
+     * Hapus member (soft delete): hilang dari daftar & tidak bisa login, riwayat iuran/pembayaran tetap tersimpan,
+     * dan No. lambungnya tidak dipakai ulang.
+     */
+    public function destroy(Request $request, Member $member): RedirectResponse
+    {
+        Gate::authorize('delete', $member);
+
+        DB::transaction(function () use ($member, $request) {
+            $member->statusLogs()->create([
+                'from_status' => $member->status,
+                'to_status' => $member->status,
+                'mode' => $member->status_mode,
+                'reason' => 'Member dihapus dari CMS',
+                'changed_by' => $request->user()->id,
+            ]);
+            $member->tokens()->delete();   // keluar dari semua sesi login
+            $member->delete();
+        });
+
+        return redirect()->route('members.index')->with('success', "Member {$member->nama_lengkap} ({$member->noLambungLabel()}) dihapus.");
+    }
+
+    /** Nomor awal pencarian No. lambung anggota baru (kosong = nomor tertinggi + 1). */
+    public function updateNoLambungStart(Request $request): RedirectResponse
+    {
+        Gate::authorize('updateSettings', Member::class);
+
+        $start = $request->validate([
+            'no_lambung_start' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_NO_LAMBUNG],
+        ], [], ['no_lambung_start' => 'nomor awal'])['no_lambung_start'] ?? null;
+
+        Setting::put(Setting::NO_LAMBUNG_START, $start === null ? null : (string) (int) $start);
+
+        return redirect()->route('members.index')->with('success', 'Nomor awal No. lambung anggota baru disimpan.');
+    }
+
+    /**
+     * Buka dokumen bukti kendaraan (disk privat). Dilayani inline + nosniff dengan MIME tersimpan;
+     * upload hanya menerima JPG/PNG/WEBP/PDF (dicek dari isi file).
+     */
+    public function document(MemberVehicleDocument $document): StreamedResponse
+    {
+        Gate::authorize('viewAny', Member::class);
+
+        $disk = Storage::disk($document->disk);
+        abort_unless($disk->exists($document->path), 404);
+
+        return $disk->response($document->path, $document->original_name, [
+            'Content-Type' => $document->mime_type,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ], 'inline');
     }
 
     /**

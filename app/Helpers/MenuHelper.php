@@ -121,13 +121,6 @@ class MenuHelper
                 'match' => '/members',
                 'can' => 'members.view',
             ],
-            [
-                'icon' => 'member-registration',
-                'name' => 'Pendaftaran Member',
-                'path' => '/member-registrations',
-                'match' => '/member-registrations',
-                'can' => 'members.view',
-            ],
         ];
     }
 

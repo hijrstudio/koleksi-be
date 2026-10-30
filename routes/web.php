@@ -16,7 +16,6 @@ use App\Http\Controllers\Cms\GuideVideoController;
 use App\Http\Controllers\Cms\HeroBannerController;
 use App\Http\Controllers\Cms\ManagementPeriodController;
 use App\Http\Controllers\Cms\MemberController;
-use App\Http\Controllers\Cms\MemberRegistrationController;
 use App\Http\Controllers\Cms\NewsController;
 use App\Http\Controllers\Cms\NotificationController;
 use App\Http\Controllers\Cms\PartnerController;
@@ -103,15 +102,13 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     // members
     Route::get('members', [MemberController::class, 'index'])->name('members.index');
     Route::get('members/data', [MemberController::class, 'data'])->name('members.data'); // DataTables server-side
+    Route::put('members/no-lambung-start', [MemberController::class, 'updateNoLambungStart'])->name('members.no-lambung-start.update');
     Route::get('members/{member}', [MemberController::class, 'show'])->name('members.show');
+    Route::get('members/{member}/edit', [MemberController::class, 'edit'])->name('members.edit');
+    Route::put('members/{member}', [MemberController::class, 'update'])->name('members.update');
+    Route::delete('members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');
     Route::put('members/{member}/status', [MemberController::class, 'updateStatus'])->name('members.status.update');
-
-    // pendaftaran member baru (review & persetujuan)
-    Route::get('member-registrations', [MemberRegistrationController::class, 'index'])->name('member-registrations.index');
-    Route::get('member-registrations/{member}', [MemberRegistrationController::class, 'show'])->name('member-registrations.show');
-    Route::post('member-registrations/{member}/approve', [MemberRegistrationController::class, 'approve'])->name('member-registrations.approve');
-    Route::post('member-registrations/{member}/reject', [MemberRegistrationController::class, 'reject'])->name('member-registrations.reject');
-    Route::get('member-documents/{document}', [MemberRegistrationController::class, 'document'])->name('member-documents.show');
+    Route::get('member-documents/{document}', [MemberController::class, 'document'])->name('member-documents.show');
 
     // lonceng notifikasi
     Route::get('notifications/{id}/open', [NotificationController::class, 'open'])->whereUuid('id')->name('notifications.open');
