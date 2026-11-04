@@ -298,7 +298,11 @@ class YoduGateway implements PaymentGateway
     private static function time(mixed $v): ?Carbon
     {
         try {
-            return is_string($v) && $v !== '' ? Carbon::parse($v) : null;
+            // Production mengirim paidTime tanpa zona ("2026-11-04 15:39:22") = WIB; yang ber-offset tetap ikut offset-nya.
+            // Dikonversi ke zona aplikasi: Eloquent menyimpan jam apa adanya tanpa konversi zona.
+            return is_string($v) && $v !== ''
+                ? Carbon::parse($v, 'Asia/Jakarta')->setTimezone(config('app.timezone'))
+                : null;
         } catch (Throwable) {
             return null;
         }

@@ -222,6 +222,41 @@ test('failed transaction callback (06) is also answered with 2008000 Successful'
     expect($this->payment->fresh()->status)->not->toBe(Payment::SUCCESS);
 });
 
+test('production callback without latestTransactionStatus is confirmed by a status check', function () {
+    $this->payment->update(['gateway_qr_id' => 'QR-1']);
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        // Jawaban cek status production: datar, paidTime tanpa zona waktu (WIB)
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response([
+            'responseCode' => '2008200', 'responseMessage' => 'Approved', 'latestTransactionStatus' => '00',
+            'paidTime' => '2026-11-04 15:39:22', 'payAmount' => ['value' => '300000.00', 'currency' => 'IDR'],
+        ]),
+    ]);
+
+    // Callback production: tanpa latestTransactionStatus, transactionStatusDesc berisi kode respons
+    $callback = collect(sandboxCallback())->except('latestTransactionStatus')->all();
+    $this->postJson('/api/payments/yodu/callback', ['transactionStatusDesc' => '2008000'] + $callback, ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
+        ->assertOk()
+        ->assertJsonPath('responseCode', '2008000');
+
+    $payment = $this->payment->fresh();
+    expect($payment->status)->toBe(Payment::SUCCESS)
+        ->and($payment->paid_at->timezone('Asia/Jakarta')->format('Y-m-d H:i:s'))->toBe('2026-11-04 15:39:22');
+});
+
+test('production callback without status leaves an unpaid payment pending', function () {
+    $this->payment->update(['gateway_qr_id' => 'QR-1']);
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response(['responseCode' => '2008200', 'latestTransactionStatus' => '03']),
+    ]);
+
+    $callback = collect(sandboxCallback())->except('latestTransactionStatus')->all();
+    $this->postJson('/api/payments/yodu/callback', $callback, ['X-CLIENT-KEY' => 'CLIENT-SECRET'])->assertOk();
+
+    expect($this->payment->fresh()->status)->toBe(Payment::PENDING);
+});
+
 test('callback with a wrong X-CLIENT-KEY is rejected', function () {
     $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'salah'])
         ->assertUnauthorized()

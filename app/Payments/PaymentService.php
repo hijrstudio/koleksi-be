@@ -178,7 +178,8 @@ class PaymentService
             return false;
         }
 
-        if ($tx->fromCallback && $tx->status === TxStatus::SUCCESS) {
+        // Callback production YODU tidak membawa latestTransactionStatus (rawCode kosong) → cukup jadi pemicu cek status
+        if ($tx->fromCallback && ($tx->status === TxStatus::SUCCESS || $tx->rawCode === '')) {
             $payment = Payment::where('merchant_ref', $tx->merchantRef)->first();
             if (! $payment) {
                 Log::warning('Callback untuk merchant_ref tidak dikenal', ['ref' => $tx->merchantRef]);
@@ -191,6 +192,9 @@ class PaymentService
             }
 
             $confirmed = $this->gateway->checkStatus($payment);
+            if ($confirmed && $confirmed->status !== TxStatus::SUCCESS && $tx->rawCode === '') {
+                return $this->apply($confirmed);   // status dari cek status (bukan callback), mis. masih pending / gagal
+            }
             if (! $confirmed || $confirmed->status !== TxStatus::SUCCESS) {
                 Log::warning('Callback SUCCESS tidak terkonfirmasi cek status', ['ref' => $tx->merchantRef]);
                 $payment->update(['last_callback' => $tx->raw ?: null]);
