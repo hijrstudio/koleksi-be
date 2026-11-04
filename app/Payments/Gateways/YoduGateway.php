@@ -28,7 +28,7 @@ class YoduGateway implements PaymentGateway
     public const PATH_STATUS = '/openapi/v1.0/qr-acq/paystatus';
 
     /** Jawaban callback (Payment Notification, service code 52) sesuai uji fungsional YODU 18.18/18.19. */
-    public const CALLBACK_OK = ['code' => '2005200', 'message' => 'Successful'];
+    public const CALLBACK_OK = ['code' => '2008000', 'message' => 'Successful'];   // expected test case production TC-CALLBACK-01
 
     public const CALLBACK_REJECTED = ['code' => '4015200', 'message' => 'Unauthorized'];
 
@@ -118,15 +118,25 @@ class YoduGateway implements PaymentGateway
             return false;
         }
 
-        $res = $this->client()->post(self::PATH_CANCEL, [
+        $res = $this->client()->post(self::PATH_CANCEL, $this->cancelRequestBody($payment, $reason));
+
+        return YoduClient::isSuccess($res['body']);
+    }
+
+    /**
+     * Body cancel QR (dipakai aplikasi & yodu:uji-production).
+     *
+     * @return array<string, mixed>
+     */
+    public function cancelRequestBody(Payment $payment, string $reason = 'Diganti QR baru'): array
+    {
+        return [
             'partnerReferenceNo' => YoduClient::uniqueRef('C'),
             'originalReferenceNo' => $payment->gateway_ref,
             'qrReffId' => $payment->gateway_qr_id,
             'cancelReason' => $reason,
             'additionalInfo' => (object) [],
-        ]);
-
-        return YoduClient::isSuccess($res['body']);
+        ];
     }
 
     public function checkStatus(Payment $payment): ?TxStatus
@@ -218,7 +228,7 @@ class YoduGateway implements PaymentGateway
     }
 
     /**
-     * Notifikasi diterima (status apa pun, termasuk gagal "06") = 200 + 2005200 "Successful".
+     * Notifikasi diterima (status apa pun, termasuk gagal "06") = 200 + 2008000 "Successful".
      * Ditolak verifikasi (IP / X-CLIENT-KEY / format) = 401 + 4015200 "Unauthorized".
      */
     public function callbackResponse(bool $ok, array $payload = []): Response

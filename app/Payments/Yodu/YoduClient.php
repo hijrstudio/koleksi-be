@@ -81,18 +81,7 @@ class YoduClient
         }
 
         return Cache::remember(self::TOKEN_CACHE_KEY, now()->addSeconds(self::TOKEN_TTL_SECONDS), function () {
-            $timestamp = self::timestamp();
-            $body = ['grantType' => 'client_credentials', 'additionalInfo' => (object) []];
-
-            $res = $this->http()
-                ->withHeaders([
-                    'X-TIMESTAMP' => $timestamp,
-                    'X-PARTNER-ID' => $this->config['client_id'],
-                    'X-CLIENT-KEY' => $this->config['client_id'],   // dokumen YODU tidak konsisten; header ekstra aman
-                    'X-SIGNATURE' => $this->signer->asymmetric($timestamp),
-                ])
-                ->withBody(json_encode($body), 'application/json')
-                ->post($this->config['token_path']);
+            [, , $res] = $this->tokenRequest();
 
             $json = $res->json() ?? [];
             if (! $res->successful() || empty($json['accessToken'])) {
@@ -102,6 +91,45 @@ class YoduClient
 
             return $json['accessToken'];
         });
+    }
+
+    /**
+     * Request token mentah untuk uji (yodu:uji-production), tanpa cache.
+     *
+     * @return array{url: string, headers: array<string, string>, body: string, http: int, response: array<mixed>|string}
+     */
+    public function tokenProbe(): array
+    {
+        [$headers, $json, $res] = $this->tokenRequest();
+
+        return [
+            'url' => rtrim($this->config['base_url'], '/').$this->config['token_path'],
+            'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/json'] + $headers,
+            'body' => $json,
+            'http' => $res->status(),
+            'response' => $res->json() ?? $res->body(),
+        ];
+    }
+
+    /** @return array{0: array<string, string>, 1: string, 2: Response} */
+    private function tokenRequest(): array
+    {
+        $timestamp = self::timestamp();
+        $json = (string) json_encode(['grantType' => 'client_credentials', 'additionalInfo' => (object) []]);
+
+        // Spec Doc Security API v1.3: header token hanya X-TIMESTAMP, X-PARTNER-ID, X-SIGNATURE (tanpa X-CLIENT-KEY)
+        $headers = [
+            'X-TIMESTAMP' => $timestamp,
+            'X-PARTNER-ID' => $this->config['client_id'],
+            'X-SIGNATURE' => $this->signer->asymmetric($timestamp),
+        ];
+
+        $res = $this->http()
+            ->withHeaders($headers)
+            ->withBody($json, 'application/json')
+            ->post($this->config['token_path']);
+
+        return [$headers, $json, $res];
     }
 
     // ------------------------------------------------------------------ request

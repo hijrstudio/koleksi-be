@@ -84,6 +84,22 @@ test('generate QR sends a signed SNAP request and parses the QR', function () {
     });
 });
 
+test('access token request follows the YODU Security API spec', function () {
+    Http::fake([
+        BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
+        BASE.'/openapi/v1.0/qr-acq/paystatus' => Http::response(['responseCode' => '2005100', 'responseData' => ['latestTransactionStatus' => '03']]),
+    ]);
+
+    app(YoduGateway::class, ['config' => config('yodu')])->checkStatus($this->payment);
+
+    Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/access/token')
+        && $r->header('X-PARTNER-ID')[0] === 'CLIENT-ID'
+        && $r->hasHeader('X-TIMESTAMP')
+        && $r->hasHeader('X-SIGNATURE')
+        && ! $r->hasHeader('X-CLIENT-KEY')                // tidak ada di daftar header token
+        && json_decode($r->body(), true)['grantType'] === 'client_credentials');
+});
+
 test('access token is cached and refreshed once when rejected', function () {
     Http::fake([
         BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
@@ -180,7 +196,7 @@ test('sandbox callback is matched by YODU reference and confirmed by a flat stat
 
     $this->postJson('/api/payments/yodu/callback', sandboxCallback(), ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
         ->assertOk()
-        ->assertJsonPath('responseCode', '2005200')
+        ->assertJsonPath('responseCode', '2008000')
         ->assertJsonPath('responseMessage', 'Successful');
 
     $log = PaymentNotification::first();
@@ -188,10 +204,10 @@ test('sandbox callback is matched by YODU reference and confirmed by a flat stat
         ->and($log->merchant_ref)->toBe('KLK0007-261012170105-ABC123')
         ->and($log->headers)->not->toHaveKey('x-client-key')
         ->and($log->response_status)->toBe(200)
-        ->and(json_decode($log->response, true)['responseCode'])->toBe('2005200');
+        ->and(json_decode($log->response, true)['responseCode'])->toBe('2008000');
 });
 
-test('failed transaction callback (06) is also answered with 2005200 Successful', function () {
+test('failed transaction callback (06) is also answered with 2008000 Successful', function () {
     $this->payment->update(['gateway_qr_id' => 'QR-1']);
     Http::fake([
         BASE.'/openapi/v1.0/access/token' => Http::response(tokenResponse()),
@@ -200,7 +216,7 @@ test('failed transaction callback (06) is also answered with 2005200 Successful'
 
     $this->postJson('/api/payments/yodu/callback', ['latestTransactionStatus' => '06'] + sandboxCallback(), ['X-CLIENT-KEY' => 'CLIENT-SECRET'])
         ->assertOk()
-        ->assertJsonPath('responseCode', '2005200')
+        ->assertJsonPath('responseCode', '2008000')
         ->assertJsonPath('responseMessage', 'Successful');
 
     expect($this->payment->fresh()->status)->not->toBe(Payment::SUCCESS);
