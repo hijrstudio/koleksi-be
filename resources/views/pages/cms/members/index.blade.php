@@ -16,6 +16,15 @@
 @section('content')
     <x-common.page-breadcrumb pageTitle="Daftar Member" />
 
+    @can('create', App\Models\Member::class)
+        <div class="mb-6 flex justify-end">
+            <a href="{{ route('members.create') }}"
+                class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium text-white transition">
+                + Tambah Member
+            </a>
+        </div>
+    @endcan
+
     @if (session('success'))
         <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)"
             class="border-success-500 bg-success-50 dark:border-success-500/30 dark:bg-success-500/15 mb-6 rounded-xl border p-4">

@@ -103,6 +103,12 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     Route::get('members', [MemberController::class, 'index'])->name('members.index');
     Route::get('members/data', [MemberController::class, 'data'])->name('members.data'); // DataTables server-side
     Route::put('members/no-lambung-start', [MemberController::class, 'updateNoLambungStart'])->name('members.no-lambung-start.update');
+    Route::get('members/create', [MemberController::class, 'create'])->name('members.create');
+    Route::post('members', [MemberController::class, 'store'])->name('members.store');
+    Route::get('members/regions/{regency}/districts', [MemberController::class, 'districts'])
+        ->where('regency', '\d{2}\.\d{2}')->name('members.regions.districts');
+    Route::get('members/regions/districts/{district}/villages', [MemberController::class, 'villages'])
+        ->where('district', '\d{2}\.\d{2}\.\d{2}')->name('members.regions.villages');
     Route::get('members/{member}', [MemberController::class, 'show'])->name('members.show');
     Route::get('members/{member}/edit', [MemberController::class, 'edit'])->name('members.edit');
     Route::put('members/{member}', [MemberController::class, 'update'])->name('members.update');

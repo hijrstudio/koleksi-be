@@ -24,21 +24,32 @@ test('admin changes the number: duplicates (also of deleted members) are refused
     Member::factory()->create(['no_lambung' => 50]);
     Member::factory()->create(['no_lambung' => 51])->delete();
 
-    $this->actingAs($this->admin)->get(route('members.edit', $this->member))->assertOk()->assertSee('#042');
+    $this->actingAs($this->admin)->get(route('members.edit', $this->member))->assertOk()->assertSee('value="42"', false);
+
+    // Form edit lengkap: data lain tetap, hanya No. lambung yang diganti
+    $form = fn (int $number) => [
+        'no_lambung' => $number,
+        'nama_lengkap' => $this->member->nama_lengkap,
+        'email' => $this->member->email,
+        'no_hp' => $this->member->no_hp,
+        'tgl_bergabung' => $this->member->tgl_bergabung->toDateString(),
+        'has_vehicle' => '0',
+        'password_mode' => 'keep',
+    ];
 
     foreach ([50, 51] as $taken) {
-        $this->actingAs($this->admin)->put(route('members.update', $this->member), ['no_lambung' => $taken])
+        $this->actingAs($this->admin)->put(route('members.update', $this->member), $form($taken))
             ->assertSessionHasErrors('no_lambung');
     }
-    $this->actingAs($this->admin)->put(route('members.update', $this->member), ['no_lambung' => 0])
+    $this->actingAs($this->admin)->put(route('members.update', $this->member), $form(0))
         ->assertSessionHasErrors('no_lambung');
 
-    $this->actingAs($this->admin)->put(route('members.update', $this->member), ['no_lambung' => 370])
+    $this->actingAs($this->admin)->put(route('members.update', $this->member), $form(370))
         ->assertRedirect(route('members.show', $this->member));
 
     expect($this->member->fresh()->no_lambung)->toBe(370)
         ->and($due->fresh()->invoice_number)->toEndWith('-0370')
-        ->and($this->member->statusLogs()->latest('id')->first()->reason)->toBe('No. lambung diubah dari #042 menjadi #370');
+        ->and($this->member->statusLogs()->latest('id')->first()->reason)->toBe('Data diubah dari CMS: No. lambung (No. lambung #042 → #370)');
 });
 
 test('admin soft deletes a member: hidden, logged out, history and number kept', function () {
@@ -70,7 +81,7 @@ test('the list offers edit and delete only to admins with the permission', funct
         ->assertJsonPath('data.0.delete_url', null);
 
     $this->actingAs($viewer)->get(route('members.edit', $this->member))->assertForbidden();
-    $this->actingAs($viewer)->put(route('members.update', $this->member), ['no_lambung' => 99])->assertForbidden();
+    $this->actingAs($viewer)->put(route('members.update', $this->member), ['no_lambung' => 99, 'nama_lengkap' => 'X', 'tgl_bergabung' => today()->toDateString(), 'has_vehicle' => '0'])->assertForbidden();
     $this->actingAs($viewer)->delete(route('members.destroy', $this->member))->assertForbidden();
     $this->actingAs($viewer)->put(route('members.no-lambung-start.update'), ['no_lambung_start' => 309])->assertForbidden();
 

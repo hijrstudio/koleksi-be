@@ -41,12 +41,12 @@
             @can('update', $member)
                 <a href="{{ route('members.edit', $member) }}"
                     class="rounded-lg border border-gray-300 px-3 py-1.5 text-theme-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]">
-                    Edit No. Lambung
+                    Edit Member
                 </a>
             @endcan
             @can('delete', $member)
                 <form method="POST" action="{{ route('members.destroy', $member) }}"
-                    x-data @submit.prevent="if (confirm('Hapus member {{ e($member->nama_lengkap) }} ({{ $member->noLambungLabel() }})?\n\nMember tidak bisa login lagi dan hilang dari daftar. Riwayat iuran tetap tersimpan, No. lambungnya tidak dipakai ulang.')) $el.submit()">
+                    x-data @submit.prevent="if (confirm(@js('Hapus member '.$member->nama_lengkap.' ('.$member->noLambungLabel().")?\n\nMember tidak bisa login lagi dan hilang dari daftar. Riwayat iuran tetap tersimpan, No. lambungnya tidak dipakai ulang."))) $el.submit()">
                     @csrf
                     @method('DELETE')
                     <button type="submit"

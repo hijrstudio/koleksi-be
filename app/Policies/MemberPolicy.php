@@ -22,7 +22,13 @@ class MemberPolicy
         return $user->can('members.update-status');
     }
 
-    /** Edit data member (No. lambung). */
+    /** Tambah member dari CMS. */
+    public function create(User $user): bool
+    {
+        return $user->can('members.create');
+    }
+
+    /** Edit data member. */
     public function update(User $user, Member $member): bool
     {
         return $user->can('members.update');

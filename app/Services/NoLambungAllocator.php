@@ -93,7 +93,8 @@ class NoLambungAllocator
     }
 
     /**
-     * Ganti No. lambung anggota (CMS). Ditolak kalau nomor sudah dipakai anggota lain (termasuk yang dihapus).
+     * Ganti No. lambung anggota, atau beri nomor pilihan admin ke anggota baru (CMS). Ditolak kalau nomor sudah
+     * dipakai anggota lain (termasuk yang dihapus).
      *
      * @param  Closure(): void  $save
      *
@@ -102,7 +103,7 @@ class NoLambungAllocator
     public function change(Member $member, int $number, Closure $save): void
     {
         $this->locked(function () use ($member, $number, $save) {
-            if ($this->isTaken($number, $member)) {
+            if ($this->isTaken($number, $member->exists ? $member : null)) {
                 throw self::takenException($number);
             }
 

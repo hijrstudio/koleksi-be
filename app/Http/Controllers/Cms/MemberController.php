@@ -3,10 +3,16 @@
 namespace App\Http\Controllers\Cms;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cms\MemberRequest;
 use App\Http\Requests\Cms\UpdateMemberStatusRequest;
+use App\Models\District;
 use App\Models\Member;
 use App\Models\MemberVehicleDocument;
+use App\Models\Regency;
 use App\Models\Setting;
+use App\Models\VehicleBrand;
+use App\Models\Village;
+use App\Services\MemberAdminService;
 use App\Services\MembershipService;
 use App\Services\NoLambungAllocator;
 use Illuminate\Http\JsonResponse;
@@ -157,49 +163,72 @@ class MemberController extends Controller
         return redirect()->route('members.show', $member)->with('success', 'Status member berhasil diperbarui.');
     }
 
+    public function create(NoLambungAllocator $noLambung): View
+    {
+        Gate::authorize('create', Member::class);
+
+        return view('pages.cms.members.form', [
+            'title' => 'Tambah Member',
+            'member' => new Member(['tgl_bergabung' => today(), 'has_vehicle' => false]),
+            'vehicle' => null,
+            'hasDues' => false,
+            ...$this->formOptions($noLambung, null),
+        ]);
+    }
+
+    public function store(MemberRequest $request, MemberAdminService $members): RedirectResponse
+    {
+        $member = $members->create($request->validated(), $request->user());
+
+        return redirect()->route('members.show', $member)
+            ->with('success', "Member {$member->nama_lengkap} ({$member->noLambungLabel()}) ditambahkan.");
+    }
+
     public function edit(Member $member, NoLambungAllocator $noLambung): View
     {
         Gate::authorize('update', $member);
         abort_unless($member->isRegistrationApproved(), 404);
 
-        return view('pages.cms.members.edit', [
+        return view('pages.cms.members.form', [
             'title' => 'Edit Member',
             'member' => $member,
-            'nextNoLambung' => $noLambung->next(),
+            'vehicle' => $member->primaryVehicle(),
+            'hasDues' => $member->dues()->exists(),
+            ...$this->formOptions($noLambung, $member),
         ]);
     }
 
     /**
-     * Ubah No. lambung. Ditolak kalau sudah dipakai anggota lain (termasuk yang dihapus); nomor invoice iuran
-     * member ikut disesuaikan.
+     * Ubah data member. No. lambung ditolak kalau sudah dipakai anggota lain (termasuk yang dihapus); nomor invoice
+     * iuran member ikut disesuaikan.
      */
-    public function update(Request $request, Member $member, NoLambungAllocator $noLambung, MembershipService $membership): RedirectResponse
+    public function update(MemberRequest $request, Member $member, MemberAdminService $members): RedirectResponse
     {
-        Gate::authorize('update', $member);
         abort_unless($member->isRegistrationApproved(), 404);
 
-        $number = (int) $request->validate([
-            'no_lambung' => ['required', 'integer', 'min:1', 'max:'.self::MAX_NO_LAMBUNG],
-        ], [], ['no_lambung' => 'No. lambung'])['no_lambung'];
+        $members->update($member, $request->validated(), $request->user());
 
-        if ($number === $member->no_lambung) {
-            return redirect()->route('members.show', $member)->with('success', 'No. lambung tidak berubah.');
-        }
+        return redirect()->route('members.show', $member)->with('success', 'Data member berhasil diperbarui.');
+    }
 
-        $old = $member->noLambungLabel();
-        $noLambung->change($member, $number, fn () => DB::transaction(function () use ($member, $number, $membership, $old, $request) {
-            $member->forceFill(['no_lambung' => $number])->save();
-            $membership->renumberInvoices($member);
-            $member->statusLogs()->create([
-                'from_status' => $member->status,
-                'to_status' => $member->status,
-                'mode' => $member->status_mode,
-                'reason' => "No. lambung diubah dari {$old} menjadi {$member->noLambungLabel()}",
-                'changed_by' => $request->user()->id,
-            ]);
-        }));
+    /** Kecamatan di kota terpilih (dropdown bertingkat form member). */
+    public function districts(string $regency): JsonResponse
+    {
+        Gate::authorize('viewAny', Member::class);
 
-        return redirect()->route('members.show', $member)->with('success', "No. lambung diubah menjadi {$member->noLambungLabel()}.");
+        return response()->json([
+            'data' => District::where('regency_code', $regency)->orderBy('name')->get(['code', 'name']),
+        ]);
+    }
+
+    /** Kelurahan di kecamatan terpilih. */
+    public function villages(string $district): JsonResponse
+    {
+        Gate::authorize('viewAny', Member::class);
+
+        return response()->json([
+            'data' => Village::where('district_code', $district)->orderBy('name')->get(['code', 'name']),
+        ]);
     }
 
     /**
@@ -255,6 +284,43 @@ class MemberController extends Controller
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, no-store',
         ], 'inline');
+    }
+
+    /**
+     * Data dropdown form tambah/edit: kota (514, sekali kirim), merek + tipe (aktif + yang sedang dipakai member),
+     * kecamatan/kelurahan terpilih (sisanya dimuat saat kota/kecamatan dipilih).
+     *
+     * @return array<string, mixed>
+     */
+    private function formOptions(NoLambungAllocator $noLambung, ?Member $member): array
+    {
+        $vehicle = $member?->primaryVehicle();
+        $brandId = (int) old('vehicle_brand_id', $vehicle?->vehicle_brand_id);
+        $modelId = (int) old('vehicle_model_id', $vehicle?->vehicle_model_id);
+        $cityCode = (string) old('city_code', $member?->city_code);
+        $districtCode = (string) old('district_code', $member?->district_code);
+
+        $brands = VehicleBrand::query()
+            ->where(fn ($q) => $q->where('is_active', true)->orWhere('id', $brandId))
+            ->with(['models' => fn ($q) => $q->where(fn ($q) => $q->where('is_active', true)->orWhere('id', $modelId))
+                ->orderBy('name')->select('id', 'vehicle_brand_id', 'name')])
+            ->orderBy('sort_order')->orderBy('name')
+            ->get(['id', 'name']);
+
+        return [
+            'nextNoLambung' => $noLambung->next(),
+            'regencies' => Regency::query()
+                ->join('provinces', 'provinces.code', '=', 'regencies.province_code')
+                ->orderBy('regencies.province_code')->orderBy('regencies.name')
+                ->get(['regencies.code', 'regencies.name', 'provinces.name as province']),
+            'districts' => $cityCode !== '' ? District::where('regency_code', $cityCode)->orderBy('name')->get(['code', 'name']) : [],
+            'villages' => $districtCode !== '' ? Village::where('district_code', $districtCode)->orderBy('name')->get(['code', 'name']) : [],
+            'brands' => $brands->map(fn (VehicleBrand $b) => [
+                'id' => $b->id,
+                'name' => $b->name,
+                'models' => $b->models->map(fn ($m) => ['id' => $m->id, 'name' => $m->name])->values(),
+            ])->values(),
+        ];
     }
 
     /**
