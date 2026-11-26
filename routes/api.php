@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Member\BookmarkController as MemberBookmarkControll
 use App\Http\Controllers\Api\Member\ForumController as MemberForumController;
 use App\Http\Controllers\Api\Member\ForumPollController as MemberForumPollController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
+use App\Http\Controllers\Api\Member\MemberDirectoryController;
 use App\Http\Controllers\Api\Member\NotificationController as MemberNotificationController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
 use App\Http\Controllers\Api\Member\PasswordResetController as MemberPasswordResetController;
@@ -195,6 +196,12 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
                 ->middleware('throttle:forum-comment')->name('discussions.comment');
             Route::put('/discussions/{slug}/rating', 'rate')->where('slug', $slug)
                 ->middleware('throttle:forum-rating')->name('discussions.rate');
+        });
+
+        // Direktori anggota forum (data terbatas: No. lambung, nama, foto, merek, kota)
+        Route::prefix('forum/members')->name('forum.members.')->controller(MemberDirectoryController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/cities', 'cities')->name('cities');
         });
 
         // Polling & voting forum (dibuat admin CMS; member hanya memilih)
