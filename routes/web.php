@@ -8,6 +8,7 @@ use App\Http\Controllers\Cms\EventVideoController;
 use App\Http\Controllers\Cms\FaqController;
 use App\Http\Controllers\Cms\ForumCategoryController;
 use App\Http\Controllers\Cms\ForumDiscussionController;
+use App\Http\Controllers\Cms\ForumPollController;
 use App\Http\Controllers\Cms\GalleryAlbumController;
 use App\Http\Controllers\Cms\GuideArticleController;
 use App\Http\Controllers\Cms\GuideCategoryController;
@@ -105,6 +106,8 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     // forum
     Route::resource('forum-categories', ForumCategoryController::class)->except('show');
     Route::resource('forum-discussions', ForumDiscussionController::class);
+    Route::resource('forum-polls', ForumPollController::class);
+    Route::put('forum-polls/{forum_poll}/close', [ForumPollController::class, 'close'])->name('forum-polls.close');
     Route::post('forum-discussions/{forum_discussion}/comments', [ForumDiscussionController::class, 'comment'])
         ->name('forum-discussions.comments.store');
     Route::put('forum-comments/{forum_comment}/toggle', [ForumDiscussionController::class, 'toggleComment'])->name('forum-comments.toggle');

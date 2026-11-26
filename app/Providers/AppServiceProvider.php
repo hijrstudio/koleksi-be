@@ -100,6 +100,7 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(200)->by('forum-comment:d:'.$forumMember($request)),
         ]);
         RateLimiter::for('member-bookmark', fn (Request $request) => Limit::perMinute(30)->by('member-bookmark:'.$forumMember($request)));
+        RateLimiter::for('forum-poll-vote', fn (Request $request) => Limit::perMinute(20)->by('forum-poll-vote:'.$forumMember($request)));
         RateLimiter::for('forum-rating', fn (Request $request) => Limit::perMinute(20)->by('forum-rating:'.$forumMember($request)));
 
         RateLimiter::for('payment-callback', fn (Request $request) => Limit::perMinute(120)->by('payment-callback:'.$request->ip()));

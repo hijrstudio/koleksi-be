@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\LatestNewsController;
 use App\Http\Controllers\Api\Member\AuthController as MemberAuthController;
 use App\Http\Controllers\Api\Member\BookmarkController as MemberBookmarkController;
 use App\Http\Controllers\Api\Member\ForumController as MemberForumController;
+use App\Http\Controllers\Api\Member\ForumPollController as MemberForumPollController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
 use App\Http\Controllers\Api\Member\NotificationController as MemberNotificationController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
@@ -194,6 +195,12 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
                 ->middleware('throttle:forum-comment')->name('discussions.comment');
             Route::put('/discussions/{slug}/rating', 'rate')->where('slug', $slug)
                 ->middleware('throttle:forum-rating')->name('discussions.rate');
+        });
+
+        // Polling & voting forum (dibuat admin CMS; member hanya memilih)
+        Route::prefix('forum/polls')->name('forum.polls.')->controller(MemberForumPollController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/{poll}/vote', 'vote')->whereNumber('poll')->middleware('throttle:forum-poll-vote')->name('vote');
         });
 
         Route::get('/playbooks/{playbook}/download', [MemberPlaybookController::class, 'download'])

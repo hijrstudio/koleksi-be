@@ -37,6 +37,7 @@ class RoleSeeder extends Seeder
         'vehicle-models' => ['view', 'create', 'update', 'delete'],
         'forum-categories' => ['view', 'create', 'update', 'delete'],
         'forum-discussions' => ['view', 'create', 'update', 'delete'], // update = edit, sembunyikan, moderasi komentar
+        'forum-polls' => ['view', 'create', 'update', 'delete'], // update = edit, tutup / buka lagi
         'members' => ['view', 'create', 'update-status', 'update', 'delete'], // update = ubah data member & nomor awal No. lambung
     ];
 
