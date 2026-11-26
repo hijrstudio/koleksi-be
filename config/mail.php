@@ -115,4 +115,12 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    | Tampilan email (template di resources/views/vendor/mail): link logo ke website, dan logo PNG.
+    | Gambar email harus URL absolut yang bisa dibuka publik (Gmail / Outlook tidak menampilkan SVG).
+    */
+    'site_url' => env('MAIL_SITE_URL', env('FRONTEND_URL', 'http://localhost:3000')),
+
+    'logo_url' => env('MAIL_LOGO_URL', rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/').'/images/logo.png'),
+
 ];
