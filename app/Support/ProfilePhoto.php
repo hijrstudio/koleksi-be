@@ -24,27 +24,7 @@ final class ProfilePhoto
     /** @return string biner WebP */
     public static function process(UploadedFile $file): string
     {
-        $path = $file->getRealPath();
-        $info = $path ? @getimagesize($path) : false;
-
-        if (! $info || $info[0] * $info[1] > self::MAX_PIXELS) {
-            throw new RuntimeException('Foto tidak valid atau terlalu besar.');
-        }
-
-        $source = match ($info[2]) {
-            IMAGETYPE_JPEG => @imagecreatefromjpeg($path),
-            IMAGETYPE_PNG => @imagecreatefrompng($path),
-            IMAGETYPE_WEBP => @imagecreatefromwebp($path),
-            default => false,
-        };
-
-        if (! $source instanceof GdImage) {
-            throw new RuntimeException('Format foto tidak didukung.');
-        }
-
-        if ($info[2] === IMAGETYPE_JPEG) {
-            $source = self::applyExifOrientation($source, $path);
-        }
+        $source = self::decode($file);
 
         // Crop persegi di tengah, lalu resize
         $width = imagesx($source);
@@ -74,6 +54,37 @@ final class ProfilePhoto
         }
 
         return $binary;
+    }
+
+    /**
+     * Decode gambar unggahan (JPG/PNG/WEBP) dengan batas piksel & koreksi orientasi EXIF.
+     * Dipakai juga App\Support\CoverImage.
+     */
+    public static function decode(UploadedFile $file): GdImage
+    {
+        $path = $file->getRealPath();
+        $info = $path ? @getimagesize($path) : false;
+
+        if (! $info || $info[0] * $info[1] > self::MAX_PIXELS) {
+            throw new RuntimeException('Foto tidak valid atau terlalu besar.');
+        }
+
+        $source = match ($info[2]) {
+            IMAGETYPE_JPEG => @imagecreatefromjpeg($path),
+            IMAGETYPE_PNG => @imagecreatefrompng($path),
+            IMAGETYPE_WEBP => @imagecreatefromwebp($path),
+            default => false,
+        };
+
+        if (! $source instanceof GdImage) {
+            throw new RuntimeException('Format foto tidak didukung.');
+        }
+
+        if ($info[2] === IMAGETYPE_JPEG) {
+            $source = self::applyExifOrientation($source, $path);
+        }
+
+        return $source;
     }
 
     /** Foto dari kamera HP sering tersimpan miring + tag Orientation; putar supaya tegak. */

@@ -6,6 +6,8 @@ use App\Http\Controllers\Cms\EventCategoryController;
 use App\Http\Controllers\Cms\EventController;
 use App\Http\Controllers\Cms\EventVideoController;
 use App\Http\Controllers\Cms\FaqController;
+use App\Http\Controllers\Cms\ForumCategoryController;
+use App\Http\Controllers\Cms\ForumDiscussionController;
 use App\Http\Controllers\Cms\GalleryAlbumController;
 use App\Http\Controllers\Cms\GuideArticleController;
 use App\Http\Controllers\Cms\GuideCategoryController;
@@ -99,6 +101,14 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
         ->middleware('throttle:120,1')
         ->name('gallery-albums.photo-uploads.store');
     Route::resource('gallery-albums', GalleryAlbumController::class)->except('show');
+
+    // forum
+    Route::resource('forum-categories', ForumCategoryController::class)->except('show');
+    Route::resource('forum-discussions', ForumDiscussionController::class);
+    Route::post('forum-discussions/{forum_discussion}/comments', [ForumDiscussionController::class, 'comment'])
+        ->name('forum-discussions.comments.store');
+    Route::put('forum-comments/{forum_comment}/toggle', [ForumDiscussionController::class, 'toggleComment'])->name('forum-comments.toggle');
+    Route::delete('forum-comments/{forum_comment}', [ForumDiscussionController::class, 'destroyComment'])->name('forum-comments.destroy');
 
     // members
     Route::get('members', [MemberController::class, 'index'])->name('members.index');

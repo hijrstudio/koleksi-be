@@ -115,6 +115,14 @@ class MenuHelper
     {
         return [
             [
+                'icon' => 'forms',
+                'name' => 'Forum',
+                'subItems' => [
+                    ['name' => 'Diskusi', 'path' => '/forum-discussions', 'match' => '/forum-discussions', 'can' => 'forum-discussions.view'],
+                    ['name' => 'Kategori', 'path' => '/forum-categories', 'match' => '/forum-categories', 'can' => 'forum-categories.view'],
+                ],
+            ],
+            [
                 'icon' => 'members',
                 'name' => 'Member',
                 'subItems' => [

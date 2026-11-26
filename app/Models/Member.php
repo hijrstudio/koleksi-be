@@ -130,6 +130,11 @@ class Member extends Authenticatable
         return $this->hasMany(MemberDue::class);
     }
 
+    public function bookmarks(): HasMany
+    {
+        return $this->hasMany(MemberBookmark::class);
+    }
+
     public function vehicles(): HasMany
     {
         return $this->hasMany(MemberVehicle::class);

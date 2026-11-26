@@ -89,6 +89,19 @@ class AppServiceProvider extends ServiceProvider
             Limit::perHour(30)->by('member-password-reset:h:'.$request->ip()),
         ]);
         // Callback gateway (publik): per IP pengirim
+        // Forum: per member. Diskusi dibatasi per jam & per hari (anti spam), komentar per menit & per hari.
+        $forumMember = fn (Request $request) => (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+        RateLimiter::for('forum-discussion', fn (Request $request) => [
+            Limit::perHour(5)->by('forum-discussion:h:'.$forumMember($request)),
+            Limit::perDay(15)->by('forum-discussion:d:'.$forumMember($request)),
+        ]);
+        RateLimiter::for('forum-comment', fn (Request $request) => [
+            Limit::perMinute(6)->by('forum-comment:m:'.$forumMember($request)),
+            Limit::perDay(200)->by('forum-comment:d:'.$forumMember($request)),
+        ]);
+        RateLimiter::for('member-bookmark', fn (Request $request) => Limit::perMinute(30)->by('member-bookmark:'.$forumMember($request)));
+        RateLimiter::for('forum-rating', fn (Request $request) => Limit::perMinute(20)->by('forum-rating:'.$forumMember($request)));
+
         RateLimiter::for('payment-callback', fn (Request $request) => Limit::perMinute(120)->by('payment-callback:'.$request->ip()));
     }
 }

@@ -35,6 +35,8 @@ class RoleSeeder extends Seeder
         'spklu-operators' => ['view', 'create', 'update', 'delete'],
         'vehicle-brands' => ['view', 'create', 'update', 'delete'],
         'vehicle-models' => ['view', 'create', 'update', 'delete'],
+        'forum-categories' => ['view', 'create', 'update', 'delete'],
+        'forum-discussions' => ['view', 'create', 'update', 'delete'], // update = edit, sembunyikan, moderasi komentar
         'members' => ['view', 'create', 'update-status', 'update', 'delete'], // update = ubah data member & nomor awal No. lambung
     ];
 

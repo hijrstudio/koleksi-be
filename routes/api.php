@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\LatestEventController;
 use App\Http\Controllers\Api\LatestGuideController;
 use App\Http\Controllers\Api\LatestNewsController;
 use App\Http\Controllers\Api\Member\AuthController as MemberAuthController;
+use App\Http\Controllers\Api\Member\BookmarkController as MemberBookmarkController;
+use App\Http\Controllers\Api\Member\ForumController as MemberForumController;
 use App\Http\Controllers\Api\Member\IuranPaymentController;
 use App\Http\Controllers\Api\Member\NotificationController as MemberNotificationController;
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
@@ -170,6 +172,29 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
         // Lonceng notifikasi di website
         Route::get('/notifications', [MemberNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read', [MemberNotificationController::class, 'markAsRead'])->name('notifications.read');
+
+        // Simpanan (bookmark): diskusi forum, berita, artikel
+        Route::prefix('bookmarks')->name('bookmarks.')->controller(MemberBookmarkController::class)->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/status', 'status')->name('status');
+            Route::put('/', 'store')->middleware('throttle:member-bookmark')->name('store');
+            Route::delete('/', 'destroy')->middleware('throttle:member-bookmark')->name('destroy');
+        });
+
+        // Forum (hanya member yang login)
+        Route::prefix('forum')->name('forum.')->controller(MemberForumController::class)->group(function () {
+            $slug = '[a-z0-9-]{1,190}';
+            Route::get('/categories', 'categories')->name('categories');
+            Route::get('/overview', 'overview')->name('overview');
+            Route::get('/discussions', 'index')->name('discussions.index');
+            Route::post('/discussions', 'store')->middleware('throttle:forum-discussion')->name('discussions.store');
+            Route::get('/discussions/{slug}', 'show')->where('slug', $slug)->name('discussions.show');
+            Route::get('/discussions/{slug}/comments', 'comments')->where('slug', $slug)->name('discussions.comments');
+            Route::post('/discussions/{slug}/comments', 'comment')->where('slug', $slug)
+                ->middleware('throttle:forum-comment')->name('discussions.comment');
+            Route::put('/discussions/{slug}/rating', 'rate')->where('slug', $slug)
+                ->middleware('throttle:forum-rating')->name('discussions.rate');
+        });
 
         Route::get('/playbooks/{playbook}/download', [MemberPlaybookController::class, 'download'])
             ->whereNumber('playbook')->name('playbooks.download');
