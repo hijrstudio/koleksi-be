@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Member;
 use App\Services\MemberRegistrationService;
+use App\Services\MembershipFees;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -27,13 +28,13 @@ class MemberRegistrationPaymentLink extends Notification implements ShouldQueue
 
     public function toMail(Member $notifiable): MailMessage
     {
-        $fee = 'Rp'.number_format((int) config('membership.annual_fee'), 0, ',', '.');
+        $fee = 'Rp'.number_format(app(MembershipFees::class)->registration(), 0, ',', '.');
         $deadline = $notifiable->payment_due_at?->timezone('Asia/Jakarta')->translatedFormat('d F Y H:i');
 
         return (new MailMessage)
             ->subject('Selesaikan pembayaran iuran pendaftaran KOLEKSI')
             ->greeting('Halo '.($notifiable->nama_panggilan ?: $notifiable->nama_lengkap).',')
-            ->line("E-mail Anda sudah terverifikasi. Selesaikan pendaftaran dengan membayar iuran tahunan sebesar {$fee} melalui QRIS (semua e-wallet & mobile banking).")
+            ->line("E-mail Anda sudah terverifikasi. Selesaikan pendaftaran dengan membayar biaya pendaftaran sebesar {$fee} melalui QRIS (semua e-wallet & mobile banking).")
             ->action('Bayar Iuran Pendaftaran', app(MemberRegistrationService::class)->paymentUrl($notifiable))
             ->line("Link ini berlaku sampai {$deadline} WIB. Setelah pembayaran berhasil, akun Anda langsung aktif dan mendapat No. anggota.")
             ->line('Kalau batas waktu terlewat, pendaftaran dihapus dan Anda bisa mendaftar ulang.');

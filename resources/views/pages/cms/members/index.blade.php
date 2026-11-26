@@ -68,6 +68,54 @@
         @enderror
     </div>
 
+    <!-- Biaya keanggotaan (harga tagihan baru) -->
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">Biaya keanggotaan</p>
+                <p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+                    Biaya pendaftaran dibayar sekali oleh anggota baru (periode pertama); iuran tahunan untuk perpanjangan.
+                    Perubahan berlaku untuk tagihan baru, tagihan yang sudah terbit tetap dengan nominalnya.
+                </p>
+                <p class="mt-2 text-theme-sm text-gray-700 dark:text-gray-300">
+                    Pendaftaran: <span class="font-semibold">Rp{{ number_format($registrationFee, 0, ',', '.') }}</span>
+                    · Perpanjangan: <span class="font-semibold">Rp{{ number_format($annualFee, 0, ',', '.') }}</span>
+                </p>
+                @if ($feesUpdate)
+                    <p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+                        Terakhir diubah {{ $feesUpdate->updated_at?->timezone('Asia/Jakarta')->translatedFormat('d M Y H:i') }} WIB
+                        @if ($feesUpdate->updater) oleh {{ $feesUpdate->updater->name }} @endif
+                    </p>
+                @endif
+            </div>
+            @can('updateSettings', App\Models\Member::class)
+                <form method="POST" action="{{ route('members.fees.update') }}" class="flex flex-wrap items-end gap-3"
+                    x-data @submit="if (!confirm('Simpan biaya keanggotaan? Berlaku untuk tagihan baru.')) $event.preventDefault()">
+                    @csrf
+                    @method('PUT')
+                    @foreach (['registration_fee' => ['Biaya pendaftaran', $registrationFee], 'annual_fee' => ['Iuran tahunan', $annualFee]] as $field => [$label, $value])
+                        <div>
+                            <label for="{{ $field }}" class="mb-1.5 block text-theme-xs font-medium text-gray-700 dark:text-gray-400">{{ $label }} (Rp)</label>
+                            <input type="number" id="{{ $field }}" name="{{ $field }}" required step="1000"
+                                min="{{ App\Services\MembershipFees::MIN }}" max="{{ App\Services\MembershipFees::MAX }}"
+                                value="{{ old($field, $value) }}"
+                                class="shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 h-11 w-40 rounded-lg border bg-transparent px-4 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:bg-gray-900 dark:text-white/90 {{ $errors->has($field) ? 'border-error-500' : 'border-gray-300 dark:border-gray-700' }}" />
+                        </div>
+                    @endforeach
+                    <button type="submit"
+                        class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex h-11 items-center rounded-lg px-4 text-sm font-medium text-white">
+                        Simpan
+                    </button>
+                </form>
+            @endcan
+        </div>
+        @foreach (['registration_fee', 'annual_fee'] as $field)
+            @error($field)
+                <p class="text-error-500 mt-2 text-theme-xs">{{ $message }}</p>
+            @enderror
+        @endforeach
+    </div>
+
     <!-- Summary cards (klik = filter tabel) -->
     <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         @foreach ($cards as $card)

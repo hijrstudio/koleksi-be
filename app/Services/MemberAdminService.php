@@ -44,6 +44,7 @@ class MemberAdminService
     public function __construct(
         private readonly NoLambungAllocator $noLambung,
         private readonly MembershipService $membership,
+        private readonly MembershipFees $fees,
     ) {}
 
     /**
@@ -214,13 +215,19 @@ class MemberAdminService
     {
         $term = $this->membership->currentTerm($member);
 
-        match ($data['first_due']) {
-            MemberRequest::FIRST_DUE_PAID => $this->membership->markPaid(
-                $this->membership->invoiceFor($member, $term), $data['payment_method'], now(), $admin, 'Dicatat admin saat menambah member',
-            ),
-            MemberRequest::FIRST_DUE_WAIVED => $this->membership->waive($member, $term, $admin, 'Dibebaskan admin saat menambah member'),
-            default => $this->membership->invoiceFor($member, $term),
-        };
+        if ($data['first_due'] === MemberRequest::FIRST_DUE_WAIVED) {
+            $this->membership->waive($member, $term, $admin, 'Dibebaskan admin saat menambah member');
+
+            return;
+        }
+
+        // Anggota baru: periode pertama = biaya pendaftaran (perpanjangan berikutnya = iuran tahunan)
+        $due = $this->membership->invoiceFor($member, $term);
+        $due->update(['amount' => $this->fees->registration()]);
+
+        if ($data['first_due'] === MemberRequest::FIRST_DUE_PAID) {
+            $this->membership->markPaid($due, $data['payment_method'], now(), $admin, 'Dicatat admin saat menambah member');
+        }
     }
 
     private function log(Member $member, User $admin, string $reason): void

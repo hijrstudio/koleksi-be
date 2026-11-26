@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\DB;
  */
 class MembershipService
 {
+    public function __construct(private MembershipFees $fees) {}
+
     /** Periode keanggotaan member yang mencakup tanggal tsb (default hari ini). */
     public function currentTerm(Member $member, ?Carbon $date = null): MembershipTerm
     {
@@ -54,7 +56,7 @@ class MembershipService
                 'period_label' => $term->label(),
                 'period_start' => $term->start,
                 'period_end' => $term->end,
-                'amount' => config('membership.annual_fee'),
+                'amount' => $this->fees->forMember($member),
                 'status' => MemberDue::UNPAID,
             ]);
     }

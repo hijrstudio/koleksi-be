@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VehicleBrand;
 use App\Models\VehicleModel;
 use App\Notifications\ResetMemberPassword;
+use App\Services\MembershipFees;
 use App\Services\MembershipService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -266,4 +267,14 @@ test('the delete confirmation encodes the member name safely', function () {
     $this->actingAs($this->admin)->get(route('members.show', $member))
         ->assertOk()
         ->assertDontSee("confirm('Hapus member x'); alert(1);//", false);
+});
+
+test('a member added by an admin is billed the registration fee for the first term', function () {
+    app(MembershipFees::class)->update(500000, 300000, $this->admin);
+
+    $this->actingAs($this->admin)->get(route('members.create'))->assertSee('Rp500.000');
+    $this->actingAs($this->admin)->post(route('members.store'), memberPayload(['first_due' => 'unpaid', 'password_mode' => 'email']))
+        ->assertSessionHasNoErrors();
+
+    expect(Member::where('email', 'siti@example.com')->firstOrFail()->dues()->sole()->amount)->toBe(500000);
 });

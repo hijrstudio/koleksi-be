@@ -4,6 +4,7 @@ namespace App\Payments;
 
 use App\Models\Member;
 use App\Models\MemberDue;
+use App\Services\MembershipFees;
 use App\Services\MembershipService;
 use App\Support\MembershipTerm;
 use Illuminate\Support\Carbon;
@@ -23,11 +24,12 @@ use Illuminate\Support\Collection;
  *    walau pemutihannya belum dicatat (members:waive-arrears);
  *  - status aktif yang ditetapkan manual oleh pengurus → tidak ada tagihan.
  *
- * Nominal tagihan yang dibuat sebelum iuran tahunan diatur (amount = 0) memakai iuran tahunan saat ini.
+ * Nominal: tagihan yang sudah terbit memakai nominalnya sendiri; yang belum terbit (atau amount = 0) memakai harga
+ * saat ini dari MembershipFees: biaya pendaftaran untuk pendaftar yang belum membayar, iuran tahunan untuk lainnya.
  */
 class BillingResolver
 {
-    public function __construct(private MembershipService $membership) {}
+    public function __construct(private MembershipService $membership, private MembershipFees $fees) {}
 
     /**
      *   ok       → lunas & jatuh tempo masih > jendela (atau aktif manual)
@@ -119,7 +121,7 @@ class BillingResolver
      */
     private function lines(Member $member, Carbon $date): Collection
     {
-        $fee = (int) config('membership.annual_fee');
+        $fee = $this->fees->forMember($member);
         $anchor = $member->membershipAnchor();
         $renewal = $this->membership->renewalTerm($member, $date);
         $cutoff = $this->membership->arrearsCutoffYear();

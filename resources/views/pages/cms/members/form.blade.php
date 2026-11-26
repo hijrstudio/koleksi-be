@@ -109,7 +109,8 @@
                             <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
                         @enderror
                         <p class="{{ $hint }}">
-                            Periode yang mencakup hari ini. Status member dihitung otomatis dari iuran:
+                            Periode yang mencakup hari ini, sebesar biaya pendaftaran
+                            (Rp{{ number_format($registrationFee, 0, ',', '.') }}). Status member dihitung otomatis dari iuran:
                             lunas / dibebaskan = aktif, belum bayar = tidak aktif sampai dibayar.
                         </p>
                     </div>

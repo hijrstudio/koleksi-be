@@ -10,8 +10,10 @@ use App\Notifications\MemberRegistrationActivated;
 use App\Notifications\MemberRegistrationPaymentLink;
 use App\Notifications\NewMemberRegistration;
 use App\Notifications\VerifyMemberRegistrationEmail;
+use App\Payments\BillingResolver;
 use App\Payments\Gateways\FakeGateway;
 use App\Services\MemberRegistrationService;
+use App\Services\MembershipFees;
 use App\Services\RegistrationPaymentToken;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -375,4 +377,23 @@ test('pending registrations from the old review flow can be converted to the pay
         ->and($member->fresh()->payment_due_at)->not->toBeNull();
     Notification::assertSentTo($member, MemberRegistrationPaymentLink::class);
     expect(app(MemberRegistrationService::class)->paymentUrl($member->fresh()))->toStartWith('http://fe.test/daftar/bayar?token=');
+});
+
+test('a new member pays the registration fee once, renewals are billed the annual fee', function () {
+    app(MembershipFees::class)->update(500000, 300000, $this->admin);
+    $member = registerAndVerify();
+
+    registrationApi('', ['token' => paymentToken($member)])->assertOk()->assertJsonPath('data.amount', 500000);
+    payRegistration($member);
+
+    $member->refresh();
+    expect($member->isRegistrationApproved())->toBeTrue()
+        ->and($member->dues()->sole()->amount)->toBe(500000);
+
+    // Menjelang jatuh tempo: tagihan perpanjangan memakai iuran tahunan
+    $this->travelTo($member->paid_until->copy()->subDays(10));
+    $billing = app(BillingResolver::class)->summary($member->fresh());
+    expect($billing['state'])->toBe('due_soon')
+        ->and($billing['items'])->toHaveCount(1)
+        ->and($billing['items'][0]['amount'])->toBe(300000);
 });

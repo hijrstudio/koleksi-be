@@ -12,9 +12,14 @@ return [
     'grace_days' => (int) env('MEMBERSHIP_GRACE_DAYS', 30),
 
     /*
-    | Nominal iuran tahunan (Rupiah) untuk tagihan baru.
+    | Nominal iuran (Rupiah) untuk tagihan baru — CADANGAN saja: harga diatur pengurus di CMS (Daftar Member →
+    | Biaya Keanggotaan, tabel settings). Nilai .env dipakai selama harga belum pernah disimpan di CMS.
+    |   annual_fee        → iuran tahunan / perpanjangan
+    |   registration_fee  → biaya pendaftaran anggota baru (kosong = sama dengan iuran tahunan)
+    | Lihat App\Services\MembershipFees.
     */
     'annual_fee' => (int) env('MEMBERSHIP_ANNUAL_FEE', 0),
+    'registration_fee' => (int) env('MEMBERSHIP_REGISTRATION_FEE', 0),
 
     /*
     | Pemutihan tunggakan (keputusan pengurus, Okt 2026): periode keanggotaan yang dimulai SEBELUM tahun ini

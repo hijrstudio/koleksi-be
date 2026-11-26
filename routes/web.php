@@ -103,6 +103,7 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     Route::get('members', [MemberController::class, 'index'])->name('members.index');
     Route::get('members/data', [MemberController::class, 'data'])->name('members.data'); // DataTables server-side
     Route::put('members/no-lambung-start', [MemberController::class, 'updateNoLambungStart'])->name('members.no-lambung-start.update');
+    Route::put('members/fees', [MemberController::class, 'updateFees'])->name('members.fees.update');
     Route::get('members/create', [MemberController::class, 'create'])->name('members.create');
     Route::post('members', [MemberController::class, 'store'])->name('members.store');
     Route::get('members/regions/{regency}/districts', [MemberController::class, 'districts'])

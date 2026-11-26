@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\VehicleBrand;
 use App\Models\Village;
 use App\Services\MemberAdminService;
+use App\Services\MembershipFees;
 use App\Services\MembershipService;
 use App\Services\NoLambungAllocator;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -44,7 +46,7 @@ class MemberController extends Controller
     /** Batas atas No. lambung yang bisa diisi admin (cukup untuk 5 digit). */
     public const MAX_NO_LAMBUNG = 99999;
 
-    public function index(NoLambungAllocator $noLambung): View
+    public function index(NoLambungAllocator $noLambung, MembershipFees $fees): View
     {
         Gate::authorize('viewAny', Member::class);
 
@@ -55,6 +57,11 @@ class MemberController extends Controller
             'noLambungStart' => Setting::get(Setting::NO_LAMBUNG_START),
             'nextNoLambung' => $noLambung->next(),
             'highestNoLambung' => $noLambung->highest(),
+            'registrationFee' => $fees->registration(),
+            'annualFee' => $fees->annual(),
+            'feesUpdate' => Setting::query()->with('updater:id,name')
+                ->whereIn('key', [Setting::REGISTRATION_FEE, Setting::ANNUAL_FEE])
+                ->latest('updated_at')->first(),
         ]);
     }
 
@@ -263,9 +270,37 @@ class MemberController extends Controller
             'no_lambung_start' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_NO_LAMBUNG],
         ], [], ['no_lambung_start' => 'nomor awal'])['no_lambung_start'] ?? null;
 
-        Setting::put(Setting::NO_LAMBUNG_START, $start === null ? null : (string) (int) $start);
+        Setting::put(Setting::NO_LAMBUNG_START, $start === null ? null : (string) (int) $start, $request->user());
 
         return redirect()->route('members.index')->with('success', 'Nomor awal No. lambung anggota baru disimpan.');
+    }
+
+    /**
+     * Biaya pendaftaran anggota baru & iuran tahunan (perpanjangan). Berlaku untuk tagihan yang dibuat setelah ini;
+     * tagihan yang sudah terbit tetap dengan nominalnya.
+     */
+    public function updateFees(Request $request, MembershipFees $fees): RedirectResponse
+    {
+        Gate::authorize('updateSettings', Member::class);
+
+        $rule = ['required', 'integer', 'min:'.MembershipFees::MIN, 'max:'.MembershipFees::MAX];
+        $data = $request->validate([
+            'registration_fee' => $rule,
+            'annual_fee' => $rule,
+        ], [
+            'min' => ':Attribute minimal Rp'.number_format(MembershipFees::MIN, 0, ',', '.').'.',
+            'max' => ':Attribute maksimal Rp'.number_format(MembershipFees::MAX, 0, ',', '.').'.',
+        ], ['registration_fee' => 'biaya pendaftaran', 'annual_fee' => 'iuran tahunan']);
+
+        $fees->update((int) $data['registration_fee'], (int) $data['annual_fee'], $request->user());
+
+        Log::info('Biaya keanggotaan diubah', [
+            'by' => $request->user()->id,
+            'registration_fee' => (int) $data['registration_fee'],
+            'annual_fee' => (int) $data['annual_fee'],
+        ]);
+
+        return redirect()->route('members.index')->with('success', 'Biaya keanggotaan disimpan. Berlaku untuk tagihan baru.');
     }
 
     /**
@@ -309,6 +344,7 @@ class MemberController extends Controller
 
         return [
             'nextNoLambung' => $noLambung->next(),
+            'registrationFee' => app(MembershipFees::class)->registration(),
             'regencies' => Regency::query()
                 ->join('provinces', 'provinces.code', '=', 'regencies.province_code')
                 ->orderBy('regencies.province_code')->orderBy('regencies.name')
