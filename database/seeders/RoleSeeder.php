@@ -38,6 +38,7 @@ class RoleSeeder extends Seeder
         'forum-categories' => ['view', 'create', 'update', 'delete'],
         'forum-discussions' => ['view', 'create', 'update', 'delete'], // update = edit, sembunyikan, moderasi komentar
         'forum-polls' => ['view', 'create', 'update', 'delete'], // update = edit, tutup / buka lagi
+        'transactions' => ['view', 'export', 'verify'], // verify = cek status ke YODU & sinkronkan
         'members' => ['view', 'create', 'update-status', 'update', 'delete'], // update = ubah data member & nomor awal No. lambung
     ];
 

@@ -109,6 +109,8 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(200)->by('forum-comment:d:'.$forumMember($request)),
         ]);
         RateLimiter::for('member-bookmark', fn (Request $request) => Limit::perMinute(30)->by('member-bookmark:'.$forumMember($request)));
+        // Pencarian publik: per IP (Next.js meneruskan IP pengunjung sebagai X-Forwarded-For)
+        RateLimiter::for('search', fn (Request $request) => Limit::perMinute(60)->by('search:'.$request->ip()));
         RateLimiter::for('member-points', fn (Request $request) => Limit::perMinute(60)->by('member-points:'.$forumMember($request)));
         RateLimiter::for('forum-poll-vote', fn (Request $request) => Limit::perMinute(20)->by('forum-poll-vote:'.$forumMember($request)));
         RateLimiter::for('forum-rating', fn (Request $request) => Limit::perMinute(20)->by('forum-rating:'.$forumMember($request)));

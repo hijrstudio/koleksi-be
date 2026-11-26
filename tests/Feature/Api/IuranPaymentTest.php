@@ -62,7 +62,8 @@ test('checkout creates a QRIS for every outstanding term and matches the dashboa
         ->and($res->json('data.status'))->toBe('pending')
         ->and($res->json('data.qr_string'))->toStartWith('000201')
         ->and(collect($res->json('data.items'))->pluck('period_label')->all())->toBe(['2025-2026', '2026-2027'])
-        ->and($res->json('data'))->not->toHaveKeys(['request_payload', 'response_payload', 'net_amount']);
+        ->and($res->json('data'))->not->toHaveKeys(['request_payload', 'response_payload', 'net_amount'])
+        ->and(Payment::where('merchant_ref', $res->json('data.merchant_ref'))->value('purpose'))->toBe(Payment::PURPOSE_DUES);
 });
 
 test('checkout is idempotent while the QR is still valid', function () {

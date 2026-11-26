@@ -200,3 +200,13 @@ test('the leaderboard ranks by points, earliest first on ties, and shows my rank
     $this->getJson('/api/v1/member/forum/leaderboard?period=month')->assertJsonCount(0, 'data')->assertJsonPath('me', null);
     $this->getJson('/api/v1/member/forum/leaderboard?period=all')->assertJsonCount(3, 'data');
 });
+
+test('the profile shows all-time XP', function () {
+    app(PointService::class)->award($this->budi, 'visit', 'visit:a');
+    app(PointService::class)->award($this->budi, 'menu', 'menu:berita:a');
+    Sanctum::actingAs($this->budi, ['member']);
+
+    $this->getJson('/api/v1/member/me')->assertOk()->assertJsonPath('data.xp', 15);
+    Sanctum::actingAs($this->sari, ['member']);
+    $this->getJson('/api/v1/member/me')->assertOk()->assertJsonPath('data.xp', 0);
+});

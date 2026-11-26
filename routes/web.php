@@ -25,6 +25,7 @@ use App\Http\Controllers\Cms\NotificationController;
 use App\Http\Controllers\Cms\PartnerController;
 use App\Http\Controllers\Cms\SpkluOperatorController;
 use App\Http\Controllers\Cms\SponsorController;
+use App\Http\Controllers\Cms\TransactionController;
 use App\Http\Controllers\Cms\VehicleBrandController;
 use App\Http\Controllers\Cms\VehicleModelController;
 use App\Http\Controllers\LocaleController;
@@ -107,6 +108,13 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     Route::resource('forum-categories', ForumCategoryController::class)->except('show');
     Route::resource('forum-discussions', ForumDiscussionController::class);
     Route::resource('forum-polls', ForumPollController::class);
+    // laporan transaksi (QRIS YODU + dicatat admin)
+    Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
+    Route::post('transactions/payments/{payment}/reconcile', [TransactionController::class, 'reconcile'])
+        ->middleware('throttle:30,1')->name('transactions.reconcile');
+    Route::post('transactions/payments/{payment}/sync', [TransactionController::class, 'sync'])
+        ->middleware('throttle:10,1')->name('transactions.sync');
     Route::put('forum-polls/{forum_poll}/close', [ForumPollController::class, 'close'])->name('forum-polls.close');
     Route::post('forum-discussions/{forum_discussion}/comments', [ForumDiscussionController::class, 'comment'])
         ->name('forum-discussions.comments.store');

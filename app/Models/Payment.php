@@ -26,8 +26,13 @@ class Payment extends Model
 
     public const REFUNDED = 'refunded';
 
+    /** Tujuan: biaya pendaftaran anggota baru / iuran tahunan (perpanjangan). */
+    public const PURPOSE_REGISTRATION = 'registration';
+
+    public const PURPOSE_DUES = 'dues';
+
     protected $fillable = [
-        'member_id', 'gateway', 'merchant_ref', 'gateway_ref', 'gateway_qr_id',
+        'member_id', 'gateway', 'purpose', 'merchant_ref', 'gateway_ref', 'gateway_qr_id',
         'amount', 'net_amount', 'mdr_amount', 'handling_fee', 'status',
         'qr_string', 'payment_channel', 'expired_at', 'paid_at', 'last_checked_at',
         'request_payload', 'response_payload', 'last_callback', 'failure_reason',
@@ -45,6 +50,7 @@ class Payment extends Model
             'expired_at' => 'datetime',
             'paid_at' => 'datetime',
             'last_checked_at' => 'datetime',
+            'reconciled_at' => 'datetime',
             'request_payload' => 'array',
             'response_payload' => 'array',
             'last_callback' => 'array',

@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\RegistrationPaymentController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SpkluOperatorController;
 use App\Http\Controllers\Api\SponsorController;
 use App\Http\Controllers\Api\VehicleBrandController;
@@ -80,6 +81,8 @@ Route::prefix('v1')->middleware(['frontend.token', 'throttle:600,1'])->group(fun
     });
 
     // /news/latest (di atas) didaftarkan lebih dulu, jadi tidak tertangkap sebagai {slug}
+    // Pencarian website (berita, artikel, kegiatan, video edukasi)
+    Route::get('/search', SearchController::class)->middleware('throttle:search')->name('api.v1.search');
     Route::get('/news', [NewsController::class, 'index'])->name('api.v1.news.index');
     Route::get('/news/{slug}', [NewsController::class, 'show'])->where('slug', '[a-z0-9-]+')->name('api.v1.news.show');
 

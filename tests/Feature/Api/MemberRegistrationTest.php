@@ -2,6 +2,7 @@
 
 use App\Models\Member;
 use App\Models\MemberVehicle;
+use App\Models\Payment;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\VehicleBrand;
@@ -99,6 +100,7 @@ function registrationApi(string $path, array $body)
 function payRegistration(Member $member): string
 {
     $ref = registrationApi('/checkout', ['token' => paymentToken($member)])->assertCreated()->json('data.merchant_ref');
+    expect(Payment::where('merchant_ref', $ref)->value('purpose'))->toBe(Payment::PURPOSE_REGISTRATION);
     test()->postJson("/api/payments/fake/{$ref}/pay?status=success")->assertOk();
     registrationApi('/status', ['token' => paymentToken($member), 'merchant_ref' => $ref])->assertOk();
 

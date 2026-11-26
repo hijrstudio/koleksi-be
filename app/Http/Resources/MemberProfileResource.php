@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Member;
 use App\Models\MemberDue;
+use App\Models\MemberPointTotal;
 use App\Payments\BillingResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -48,6 +49,8 @@ class MemberProfileResource extends JsonResource
             'must_change_password' => $this->must_change_password,
             'profile_completed' => $this->profile_completed_at !== null,
             'last_login_at' => $this->last_login_at?->toIso8601String(),
+            // XP = total poin papan peringkat sepanjang waktu (lihat PointService)
+            'xp' => (int) MemberPointTotal::query()->where('member_id', $this->id)->where('period', MemberPointTotal::ALL)->value('points'),
         ];
     }
 }

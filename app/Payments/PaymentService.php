@@ -97,6 +97,8 @@ class PaymentService
             $payment = Payment::create([
                 'member_id' => $member->id,
                 'gateway' => $this->gateway->name(),
+                // Pendaftar yang belum aktif = biaya pendaftaran; anggota = iuran tahunan
+                'purpose' => $member->isAwaitingPayment() ? Payment::PURPOSE_REGISTRATION : Payment::PURPOSE_DUES,
                 // unik global (YODU mensyaratkan unik per hari), maks 64: KLK0007-261012170105-A1B2C3;
                 // pendaftar yang belum punya No. lambung memakai ID pendaftaran: KLKR00123-...
                 'merchant_ref' => sprintf('KLK%s-%s-%s',

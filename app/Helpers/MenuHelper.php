@@ -132,6 +132,13 @@ class MenuHelper
                     ['name' => 'Kendaraan di Luar Katalog', 'path' => '/member-vehicles/uncatalogued', 'match' => '/member-vehicles', 'can' => 'members.view'],
                 ],
             ],
+            [
+                'icon' => 'transactions',
+                'name' => 'Laporan Transaksi',
+                'path' => '/transactions',
+                'match' => '/transactions',
+                'can' => 'transactions.view',
+            ],
         ];
     }
 
@@ -259,6 +266,7 @@ class MenuHelper
     public static function getIconSvg($iconName)
     {
         $icons = [
+            'transactions' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.75 3.75H17.25C17.8023 3.75 18.25 4.19772 18.25 4.75V20.25L15.75 18.75L13.25 20.25L10.75 18.75L8.25 20.25L5.75 18.75V4.75C5.75 4.19772 6.19772 3.75 6.75 3.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 8.25H15M9 11.5H15M9 14.75H12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
             'members' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="8" r="3.25" stroke="currentColor" stroke-width="1.5"/><path d="M3.75 19.25C3.75 16.3505 6.10051 14 9 14C11.8995 14 14.25 16.3505 14.25 19.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M15.5 5.25C16.9497 5.25 18.125 6.42525 18.125 7.875C18.125 9.32475 16.9497 10.5 15.5 10.5M17 14.25C18.933 14.6 20.25 16.3 20.25 18.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
 
             'member-registration' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="8" r="3.25" stroke="currentColor" stroke-width="1.5"/><path d="M4.75 19.25C4.75 16.3505 7.10051 14 10 14C10.95 14 11.84 14.25 12.6 14.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M15 17.25L16.75 19L20.25 15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
