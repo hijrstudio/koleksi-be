@@ -62,6 +62,7 @@ class ForumService
 
         if ($author instanceof Member) {
             Notification::send(app(MemberRegistrationService::class)->admins(), new NewForumDiscussion($discussion));
+            app(PointService::class)->award($author, 'discussion', "discussion:{$discussion->id}");
         }
         $this->forgetStats();
 
@@ -124,6 +125,12 @@ class ForumService
 
         $this->notifyComment($discussion, $comment, $parent, $author);
         $this->forgetStats();
+
+        // Poin: hanya di diskusi orang lain & komentar yang cukup panjang (cegah spam "ok" / "mantap")
+        if ($author instanceof Member && ! $discussion->isAuthoredBy($author)
+            && mb_strlen($comment->body) >= (int) config('points.comment_min_length')) {
+            app(PointService::class)->award($author, 'comment', "comment:{$comment->id}");
+        }
 
         return $comment;
     }

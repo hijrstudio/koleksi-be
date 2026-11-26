@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Member\NotificationController as MemberNotification
 use App\Http\Controllers\Api\Member\PasswordController as MemberPasswordController;
 use App\Http\Controllers\Api\Member\PasswordResetController as MemberPasswordResetController;
 use App\Http\Controllers\Api\Member\PlaybookController as MemberPlaybookController;
+use App\Http\Controllers\Api\Member\PointController as MemberPointController;
 use App\Http\Controllers\Api\Member\ProfileController as MemberProfileController;
 use App\Http\Controllers\Api\MemberRegistrationController;
 use App\Http\Controllers\Api\NewsController;
@@ -197,6 +198,14 @@ Route::prefix('v1/member')->name('api.v1.member.')->group(function () {
             Route::put('/discussions/{slug}/rating', 'rate')->where('slug', $slug)
                 ->middleware('throttle:forum-rating')->name('discussions.rate');
         });
+
+        // Poin papan peringkat: server yang menentukan poin (config/points.php)
+        Route::prefix('points')->name('points.')->controller(MemberPointController::class)->middleware('throttle:member-points')->group(function () {
+            Route::post('/visit', 'visit')->name('visit');
+            Route::post('/read/start', 'startReading')->name('read.start');
+            Route::post('/read/claim', 'claimReading')->name('read.claim');
+        });
+        Route::get('/forum/leaderboard', [MemberPointController::class, 'leaderboard'])->name('forum.leaderboard');
 
         // Direktori anggota forum (data terbatas: No. lambung, nama, foto, merek, kota)
         Route::prefix('forum/members')->name('forum.members.')->controller(MemberDirectoryController::class)->group(function () {

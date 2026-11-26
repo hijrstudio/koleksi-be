@@ -8,6 +8,7 @@ use App\Models\ForumCategory;
 use App\Models\ForumComment;
 use App\Models\ForumDiscussion;
 use App\Services\ForumService;
+use App\Services\PointService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class ForumDiscussionController extends Controller
 {
     private const PER_PAGE = 15;
 
-    public function __construct(private ForumService $forum) {}
+    public function __construct(private ForumService $forum, private PointService $points) {}
 
     public function index(Request $request): View
     {
@@ -106,6 +107,10 @@ class ForumDiscussionController extends Controller
         ])->save();
         $this->forum->replaceImage($forumDiscussion, $request->file('image'), $request->boolean('remove_image'));
         $this->forum->forgetStats();
+        // Disembunyikan → poin penulis ditarik; ditampilkan lagi → dikembalikan
+        $forumDiscussion->isPublished()
+            ? $this->points->restore('discussion', "discussion:{$forumDiscussion->id}")
+            : $this->points->revoke('discussion', "discussion:{$forumDiscussion->id}");
 
         return redirect()->route('forum-discussions.show', $forumDiscussion)->with('success', 'Diskusi diperbarui.');
     }
@@ -116,6 +121,7 @@ class ForumDiscussionController extends Controller
 
         $forumDiscussion->delete();   // soft delete: hilang dari website, data tetap tersimpan
         $this->forum->forgetStats();
+        $this->points->revoke('discussion', "discussion:{$forumDiscussion->id}");
 
         return redirect()->route('forum-discussions.index')->with('success', 'Diskusi dihapus.');
     }
@@ -143,6 +149,9 @@ class ForumDiscussionController extends Controller
 
         $forumComment->update(['status' => $forumComment->status === ForumComment::PUBLISHED ? ForumComment::HIDDEN : ForumComment::PUBLISHED]);
         $this->forum->refreshCommentCount($discussion);
+        $forumComment->status === ForumComment::HIDDEN
+            ? $this->points->revoke('comment', "comment:{$forumComment->id}")
+            : $this->points->restore('comment', "comment:{$forumComment->id}");
 
         return back()->with('success', $forumComment->status === ForumComment::HIDDEN ? 'Komentar disembunyikan.' : 'Komentar ditampilkan lagi.');
     }
@@ -160,6 +169,7 @@ class ForumDiscussionController extends Controller
                 $ids = [...$ids, ...$level];
             }
             ForumComment::query()->whereIn('id', $ids)->delete();
+            $this->points->revokeMany('comment', array_map(fn (int $id) => "comment:{$id}", $ids));
         });
         $this->forum->refreshCommentCount($discussion);
 

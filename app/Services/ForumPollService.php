@@ -87,13 +87,17 @@ class ForumPollService
 
         try {
             // Suara pertama: insert biasa; unique index menolak klik ganda / dua tab bersamaan
-            return DB::transaction(function () use ($poll, $member, $option) {
+            $vote = DB::transaction(function () use ($poll, $member, $option) {
                 $vote = ForumPollVote::query()->create(['poll_id' => $poll->id, 'option_id' => $option->id, 'member_id' => $member->id]);
                 ForumPollOption::query()->whereKey($option->id)->increment('votes_count');
                 ForumPoll::query()->whereKey($poll->id)->increment('votes_count');
 
                 return $vote;
             });
+            // Ikut polling / voting: sekali per polling (ganti pilihan tidak menambah poin)
+            app(PointService::class)->award($member, 'poll', "poll:{$poll->id}");
+
+            return $vote;
         } catch (UniqueConstraintViolationException) {
             // Sudah pernah memilih
         }

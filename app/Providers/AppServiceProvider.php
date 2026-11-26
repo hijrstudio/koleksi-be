@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\GuideArticle;
+use App\Models\News;
 use App\Models\User;
 use App\Payments\Contracts\PaymentGateway;
 use App\Payments\Gateways\FakeGateway;
 use App\Payments\Gateways\YoduGateway;
+use App\Services\PointService;
 use App\Support\ContentImages;
 use App\Support\RichTextSanitizer;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -49,6 +52,12 @@ class AppServiceProvider extends ServiceProvider
         // Force HTTPS in production
         if (config('app.env') === 'production') {
             URL::forceScheme('https');
+        }
+
+        // Poin penulis (papan peringkat): berita / artikel dengan penulis member yang terbit
+        foreach (['news' => News::class, 'article' => GuideArticle::class] as $type => $model) {
+            $model::saved(fn ($content) => app(PointService::class)->syncAuthor($type, $content));
+            $model::deleted(fn ($content) => app(PointService::class)->syncAuthor($type, $content, deleted: true));
         }
 
         // super-admin boleh melakukan semua aksi tanpa perlu diberi permission satu per satu
@@ -100,6 +109,7 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay(200)->by('forum-comment:d:'.$forumMember($request)),
         ]);
         RateLimiter::for('member-bookmark', fn (Request $request) => Limit::perMinute(30)->by('member-bookmark:'.$forumMember($request)));
+        RateLimiter::for('member-points', fn (Request $request) => Limit::perMinute(60)->by('member-points:'.$forumMember($request)));
         RateLimiter::for('forum-poll-vote', fn (Request $request) => Limit::perMinute(20)->by('forum-poll-vote:'.$forumMember($request)));
         RateLimiter::for('forum-rating', fn (Request $request) => Limit::perMinute(20)->by('forum-rating:'.$forumMember($request)));
 
