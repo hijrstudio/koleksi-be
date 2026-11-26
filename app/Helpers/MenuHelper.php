@@ -116,10 +116,12 @@ class MenuHelper
         return [
             [
                 'icon' => 'members',
-                'name' => 'Daftar Member',
-                'path' => '/members',
-                'match' => '/members',
-                'can' => 'members.view',
+                'name' => 'Member',
+                'subItems' => [
+                    ['name' => 'Daftar Member', 'path' => '/members', 'match' => '/members', 'can' => 'members.view'],
+                    // Merek/tipe yang ditulis sendiri member, menunggu ditautkan ke katalog
+                    ['name' => 'Kendaraan di Luar Katalog', 'path' => '/member-vehicles/uncatalogued', 'match' => '/member-vehicles', 'can' => 'members.view'],
+                ],
             ],
         ];
     }

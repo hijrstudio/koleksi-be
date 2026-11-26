@@ -49,6 +49,8 @@ class MemberEditProfileResource extends JsonResource
                 'plat_status' => $vehicle->plat_status,
                 'vehicle_brand_id' => $vehicle->vehicle_brand_id,
                 'vehicle_model_id' => $vehicle->vehicle_model_id,
+                'brand_other' => $vehicle->brand_other,   // merek/tipe ditulis sendiri (belum di katalog)
+                'model_other' => $vehicle->model_other,
                 // Nama ikut dikirim: merek/tipe yang dinonaktifkan di CMS tidak ada di dropdown /vehicle-brands,
                 // FE menambahkannya sebagai opsi supaya pilihan member tetap tampil.
                 'vehicle_brand' => $vehicle->brand ? ['id' => $vehicle->brand->id, 'name' => $vehicle->brand->name, 'is_active' => $vehicle->brand->is_active] : null,

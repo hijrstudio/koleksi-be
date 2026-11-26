@@ -397,3 +397,34 @@ test('a new member pays the registration fee once, renewals are billed the annua
         ->and($billing['items'])->toHaveCount(1)
         ->and($billing['items'][0]['amount'])->toBe(300000);
 });
+
+test('a brand or model that is not in the catalog can be written in', function () {
+    // Merek katalog + tipe ditulis sendiri
+    register(['vehicle_model_id' => '', 'model_other' => '  Air   ev  Lite '])->assertCreated();
+    $vehicle = Member::firstWhere('email', 'budi@example.com')->vehicles()->first();
+    expect($vehicle->vehicle_brand_id)->toBe($this->brand->id)
+        ->and($vehicle->vehicle_model_id)->toBeNull()
+        ->and($vehicle->model_other)->toBe('Air ev Lite')
+        ->and($vehicle->isUncatalogued())->toBeTrue();
+
+    // Merek lain: tipe juga ditulis, ID katalog yang tertinggal diabaikan
+    register(['email' => 'sari@example.com', 'no_hp' => '081299998888', 'plat_nomor' => '5678', 'vin' => '',
+        'vehicle_brand_id' => '', 'vehicle_model_id' => $this->vehicleModel->id, 'brand_other' => 'Jaecoo', 'model_other' => 'J7 SHS'])
+        ->assertCreated();
+    $other = Member::firstWhere('email', 'sari@example.com')->vehicles()->first();
+    expect($other->vehicle_brand_id)->toBeNull()
+        ->and($other->vehicle_model_id)->toBeNull()
+        ->and($other->displayName())->toBe('Jaecoo J7 SHS');
+});
+
+test('a written brand or model is required, limited and sanitised', function () {
+    register(['vehicle_brand_id' => '', 'vehicle_model_id' => ''])->assertUnprocessable()->assertJsonValidationErrors('brand_other');
+    register(['vehicle_brand_id' => '', 'brand_other' => 'Jaecoo', 'model_other' => ''])->assertUnprocessable()->assertJsonValidationErrors('model_other');
+    register(['vehicle_model_id' => ''])->assertUnprocessable()->assertJsonValidationErrors('vehicle_model_id');
+    Cache::flush(); // batas percobaan daftar per menit (throttle) direset
+    register(['vehicle_model_id' => '', 'model_other' => str_repeat('A', 81)])->assertUnprocessable()->assertJsonValidationErrors('model_other');
+    register(['vehicle_model_id' => '', 'model_other' => '<b>x</b> "y"'])->assertUnprocessable()->assertJsonValidationErrors('model_other');
+    register(['vehicle_brand_id' => '', 'brand_other' => '!!!', 'model_other' => 'X'])->assertUnprocessable()->assertJsonValidationErrors('brand_other');
+
+    expect(Member::count())->toBe(0);
+});

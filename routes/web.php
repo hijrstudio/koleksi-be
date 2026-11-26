@@ -16,6 +16,7 @@ use App\Http\Controllers\Cms\GuideVideoController;
 use App\Http\Controllers\Cms\HeroBannerController;
 use App\Http\Controllers\Cms\ManagementPeriodController;
 use App\Http\Controllers\Cms\MemberController;
+use App\Http\Controllers\Cms\MemberVehicleCatalogController;
 use App\Http\Controllers\Cms\NewsController;
 use App\Http\Controllers\Cms\NotificationController;
 use App\Http\Controllers\Cms\PartnerController;
@@ -116,6 +117,8 @@ Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(functi
     Route::delete('members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');
     Route::put('members/{member}/status', [MemberController::class, 'updateStatus'])->name('members.status.update');
     Route::get('member-documents/{document}', [MemberController::class, 'document'])->name('member-documents.show');
+    Route::get('member-vehicles/uncatalogued', [MemberVehicleCatalogController::class, 'index'])->name('member-vehicles.uncatalogued');
+    Route::put('member-vehicles/uncatalogued/link', [MemberVehicleCatalogController::class, 'link'])->name('member-vehicles.uncatalogued.link');
 
     // lonceng notifikasi
     Route::get('notifications/{id}/open', [NotificationController::class, 'open'])->whereUuid('id')->name('notifications.open');

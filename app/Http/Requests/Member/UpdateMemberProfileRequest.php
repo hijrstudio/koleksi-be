@@ -5,6 +5,7 @@ namespace App\Http\Requests\Member;
 use App\Models\Member;
 use App\Models\MemberVehicle;
 use App\Support\PhoneNumber;
+use App\Support\VehicleCatalogInput;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,7 @@ class UpdateMemberProfileRequest extends FormRequest
             'plat_kode' => $upper('plat_kode', '/\s+/'),
             'plat_nomor' => $this->filled('plat_nomor') ? preg_replace('/\s+/', '', (string) $this->input('plat_nomor')) : null,
             'plat_seri' => $upper('plat_seri', '/\s+/'),
+            ...VehicleCatalogInput::normalize($this->all()),
         ]);
     }
 
@@ -92,6 +94,7 @@ class UpdateMemberProfileRequest extends FormRequest
                 Rule::exists('vehicle_models', 'id')
                     ->where('vehicle_brand_id', (int) $this->input('vehicle_brand_id'))
                     ->where($this->activeOrCurrent($this->vehicle()?->vehicle_model_id))],
+            ...VehicleCatalogInput::rules($this, required: false),
             'tahun' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer', 'between:1990,'.(now()->year + 1)],
             'documents' => ['exclude_unless:has_vehicle,1,true', 'array', 'max:'.self::MAX_DOCUMENTS],
             'documents.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:'.self::MAX_DOCUMENT_KB],
@@ -152,6 +155,7 @@ class UpdateMemberProfileRequest extends FormRequest
             'documents.*.mimes' => 'Dokumen harus berupa JPG, PNG, WEBP, atau PDF.',
             'documents.*.max' => 'Ukuran dokumen maksimal 10 MB.',
             'documents.*.file' => 'Dokumen gagal diunggah.',
+            ...VehicleCatalogInput::messages(),
         ];
     }
 
@@ -176,6 +180,8 @@ class UpdateMemberProfileRequest extends FormRequest
             'plat_status' => 'status no. plat',
             'vehicle_brand_id' => 'merek',
             'vehicle_model_id' => 'tipe',
+            'brand_other' => 'merek',
+            'model_other' => 'tipe',
         ];
     }
 

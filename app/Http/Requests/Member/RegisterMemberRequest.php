@@ -5,6 +5,7 @@ namespace App\Http\Requests\Member;
 use App\Models\Member;
 use App\Models\MemberVehicle;
 use App\Support\PhoneNumber;
+use App\Support\VehicleCatalogInput;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\FormRequest;
@@ -46,6 +47,7 @@ class RegisterMemberRequest extends FormRequest
             'plat_kode' => $upper('plat_kode'),
             'plat_nomor' => $this->filled('plat_nomor') ? preg_replace('/\s+/', '', (string) $this->input('plat_nomor')) : null,
             'plat_seri' => $upper('plat_seri'),
+            ...VehicleCatalogInput::normalize($this->all()),
         ]);
     }
 
@@ -81,10 +83,12 @@ class RegisterMemberRequest extends FormRequest
             'plat_nomor' => ['exclude_unless:has_vehicle,1,true', 'required', 'regex:/^\d{1,4}$/'],
             'plat_seri' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'regex:/^[A-Z]{1,3}$/'],
             'plat_status' => ['exclude_unless:has_vehicle,1,true', 'required', Rule::in(['permanen', 'sementara'])],
-            'vehicle_brand_id' => ['exclude_unless:has_vehicle,1,true', 'required', 'integer',
+            // Merek & tipe: dari katalog, atau ditulis sendiri kalau belum ada (VehicleCatalogInput)
+            'vehicle_brand_id' => ['exclude_unless:has_vehicle,1,true', 'required_without:brand_other', 'nullable', 'integer',
                 Rule::exists('vehicle_brands', 'id')->where('is_active', true)],
-            'vehicle_model_id' => ['exclude_unless:has_vehicle,1,true', 'required', 'integer',
+            'vehicle_model_id' => ['exclude_unless:has_vehicle,1,true', 'required_without_all:model_other,brand_other', 'nullable', 'integer',
                 Rule::exists('vehicle_models', 'id')->where('is_active', true)->where('vehicle_brand_id', (int) $this->input('vehicle_brand_id'))],
+            ...VehicleCatalogInput::rules($this, required: true),
             'tahun' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer', 'between:1990,'.(now()->year + 1)],
             'documents' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'array', 'max:'.UpdateMemberProfileRequest::MAX_DOCUMENTS],
             'documents.*' => ['file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:'.UpdateMemberProfileRequest::MAX_DOCUMENT_KB],
@@ -148,6 +152,7 @@ class RegisterMemberRequest extends FormRequest
             'documents.*.mimes' => 'Dokumen harus berupa JPG, PNG, WEBP, atau PDF.',
             'documents.*.max' => 'Ukuran dokumen maksimal 10 MB.',
             'documents.*.file' => 'Dokumen gagal diunggah.',
+            ...VehicleCatalogInput::messages(),
         ];
     }
 
@@ -174,6 +179,8 @@ class RegisterMemberRequest extends FormRequest
             'plat_status' => 'status no. plat',
             'vehicle_brand_id' => 'merek',
             'vehicle_model_id' => 'tipe',
+            'brand_other' => 'merek',
+            'model_other' => 'tipe',
             'heard_from' => 'sumber informasi',
         ];
     }

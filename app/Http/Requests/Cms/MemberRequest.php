@@ -8,6 +8,7 @@ use App\Http\Requests\Member\UpdateMemberProfileRequest;
 use App\Models\Member;
 use App\Models\MemberVehicle;
 use App\Support\PhoneNumber;
+use App\Support\VehicleCatalogInput;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -78,6 +79,7 @@ class MemberRequest extends FormRequest
             'plat_kode' => $upper('plat_kode'),
             'plat_nomor' => $this->filled('plat_nomor') ? preg_replace('/\s+/', '', (string) $this->input('plat_nomor')) : null,
             'plat_seri' => $upper('plat_seri'),
+            ...VehicleCatalogInput::normalize($this->all()),
         ]);
     }
 
@@ -122,6 +124,7 @@ class MemberRequest extends FormRequest
                 Rule::exists('vehicle_models', 'id')
                     ->where('vehicle_brand_id', (int) $this->input('vehicle_brand_id'))
                     ->where($this->activeOrCurrent($vehicle?->vehicle_model_id))],
+            ...VehicleCatalogInput::rules($this, required: false),
             'tahun' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'integer', 'between:1990,'.(now()->year + 1)],
             'warna' => ['exclude_unless:has_vehicle,1,true', 'nullable', 'string', 'max:30'],
 
@@ -201,6 +204,7 @@ class MemberRequest extends FormRequest
             'password.min' => 'Kata sandi minimal :min karakter.',
             'password.mixed' => 'Kata sandi harus mengandung huruf besar dan huruf kecil.',
             'password.numbers' => 'Kata sandi harus mengandung angka.',
+            ...VehicleCatalogInput::messages(),
         ];
     }
 
@@ -228,6 +232,8 @@ class MemberRequest extends FormRequest
             'plat_status' => 'status no. plat',
             'vehicle_brand_id' => 'merek',
             'vehicle_model_id' => 'tipe',
+            'brand_other' => 'merek',
+            'model_other' => 'tipe',
             'first_due' => 'iuran periode pertama',
             'payment_method' => 'metode pembayaran',
             'password_mode' => 'kata sandi',

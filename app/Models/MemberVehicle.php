@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\VehicleCatalogInput;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,7 +47,25 @@ class MemberVehicle extends Model
             $v->plat_nomor = trim((string) $v->plat_nomor);
             $v->plat_seri = $v->plat_seri ? strtoupper(trim($v->plat_seri)) : null;
             $v->plat_full = $v->plat_kode.$v->plat_nomor.$v->plat_seri;
+
+            // Merek/tipe di luar katalog: rapikan, dan buang kalau sudah tertaut ke katalog
+            $v->brand_other = $v->vehicle_brand_id ? null : VehicleCatalogInput::clean($v->brand_other);
+            $v->model_other = $v->vehicle_model_id ? null : VehicleCatalogInput::clean($v->model_other);
         });
+    }
+
+    /** Merek atau tipe ditulis sendiri oleh member (belum ada di katalog), menunggu ditautkan admin. */
+    public function isUncatalogued(): bool
+    {
+        return (! $this->vehicle_brand_id && filled($this->brand_other))
+            || (! $this->vehicle_model_id && filled($this->model_other));
+    }
+
+    public function scopeUncatalogued(Builder $q): void
+    {
+        $q->where(fn (Builder $q) => $q
+            ->where(fn (Builder $q) => $q->whereNull('member_vehicles.vehicle_brand_id')->whereNotNull('member_vehicles.brand_other'))
+            ->orWhere(fn (Builder $q) => $q->whereNull('member_vehicles.vehicle_model_id')->whereNotNull('member_vehicles.model_other')));
     }
 
     public function member(): BelongsTo

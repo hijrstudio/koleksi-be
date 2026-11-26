@@ -29,7 +29,8 @@ class MemberAdminService
     ];
 
     private const VEHICLE = [
-        'vin', 'plat_kode', 'plat_nomor', 'plat_seri', 'plat_status', 'vehicle_brand_id', 'vehicle_model_id', 'tahun', 'warna',
+        'vin', 'plat_kode', 'plat_nomor', 'plat_seri', 'plat_status', 'vehicle_brand_id', 'vehicle_model_id',
+        'brand_other', 'model_other', 'tahun', 'warna',
     ];
 
     /** Nama field untuk riwayat perubahan. */

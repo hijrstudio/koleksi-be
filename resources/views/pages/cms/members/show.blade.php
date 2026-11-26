@@ -303,7 +303,13 @@
                                         <span class="text-brand-500 text-theme-xs">(utama)</span>
                                     @endif
                                 </td>
-                                <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->displayName() ?: '—' }}</td>
+                                <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">
+                                    {{ $vehicle->displayName() ?: '—' }}
+                                    @if ($vehicle->isUncatalogued())
+                                        <a href="{{ route('member-vehicles.uncatalogued') }}"
+                                            class="bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-orange-400 ml-1 whitespace-nowrap rounded-full px-2 py-0.5 text-theme-xs hover:underline">di luar katalog</a>
+                                    @endif
+                                </td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->tahun ?? '—' }}</td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->warna ?? '—' }}</td>
                                 <td class="px-5 py-3 text-theme-sm text-gray-500 dark:text-gray-400">{{ $vehicle->vin ?? '—' }}</td>

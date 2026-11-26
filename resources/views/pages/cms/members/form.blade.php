@@ -47,8 +47,8 @@
             city: @js((string) $val('city_code', $member->city_code)),
             district: @js((string) $val('district_code', $member->district_code)),
             village: @js((string) $val('village_code', $member->village_code)),
-            brand: @js((string) $val('vehicle_brand_id', $vehicle?->vehicle_brand_id)),
-            model: @js((string) $val('vehicle_model_id', $vehicle?->vehicle_model_id)),
+            brand: @js($val('vehicle_brand_id', $vehicle?->vehicle_brand_id) ? (string) $val('vehicle_brand_id', $vehicle?->vehicle_brand_id) : (filled($val('brand_other', $vehicle?->brand_other)) ? 'other' : '')),
+            model: @js($val('vehicle_model_id', $vehicle?->vehicle_model_id) ? (string) $val('vehicle_model_id', $vehicle?->vehicle_model_id) : (filled($val('model_other', $vehicle?->model_other)) ? 'other' : '')),
             hasVehicle: @js($hasVehicle),
             firstDue: @js($firstDue),
             passwordMode: @js(old('password_mode', $isEdit ? MemberRequest::PASSWORD_KEEP : MemberRequest::PASSWORD_EMAIL)),
@@ -359,31 +359,49 @@
                             <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
                         @enderror
                     </div>
+                    {{-- Merek/tipe: dari katalog, atau "lain" (ditulis, belum ada di katalog). Pilihan "lain" dikirim
+                         sebagai brand_other / model_other, bukan ID. --}}
                     <div>
                         <label for="vehicle_brand_id" class="{{ $labelClass }}">Merek</label>
-                        <select id="vehicle_brand_id" name="vehicle_brand_id" x-model="brand" @change="model = ''"
+                        <input type="hidden" name="vehicle_brand_id" :value="brand === 'other' ? '' : brand" />
+                        <select id="vehicle_brand_id" x-model="brand" @change="model = ''"
                             class="{{ $selectClass }} {{ $border('vehicle_brand_id') }}">
                             <option value="">-</option>
                             <template x-for="b in brands" :key="b.id">
                                 <option :value="String(b.id)" x-text="b.name" :selected="String(b.id) === brand"></option>
                             </template>
+                            <option value="other" :selected="brand === 'other'">Merek lain (belum ada di daftar)</option>
                         </select>
-                        @error('vehicle_brand_id')
-                            <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
-                        @enderror
+                        <input type="text" name="brand_other" x-show="brand === 'other'" x-cloak :disabled="brand !== 'other'"
+                            maxlength="{{ App\Support\VehicleCatalogInput::BRAND_MAX }}" placeholder="Tulis merek"
+                            value="{{ $val('brand_other', $vehicle?->brand_other) }}" class="{{ $inputClass }} mt-2 {{ $border('brand_other') }}" />
+                        @foreach (['vehicle_brand_id', 'brand_other'] as $field)
+                            @error($field)
+                                <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
+                            @enderror
+                        @endforeach
                     </div>
                     <div>
                         <label for="vehicle_model_id" class="{{ $labelClass }}">Tipe</label>
-                        <select id="vehicle_model_id" name="vehicle_model_id" x-model="model" :disabled="!brand"
+                        <input type="hidden" name="vehicle_model_id" :value="brand === 'other' || model === 'other' ? '' : model" />
+                        <select id="vehicle_model_id" x-model="model" x-show="brand !== 'other'" :disabled="!brand"
                             class="{{ $selectClass }} {{ $border('vehicle_model_id') }}">
                             <option value="">-</option>
                             <template x-for="m in models" :key="m.id">
                                 <option :value="String(m.id)" x-text="m.name" :selected="String(m.id) === model"></option>
                             </template>
+                            <option value="other" :selected="model === 'other'">Tipe lain (belum ada di daftar)</option>
                         </select>
-                        @error('vehicle_model_id')
-                            <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
-                        @enderror
+                        <input type="text" name="model_other" x-show="brand === 'other' || model === 'other'" x-cloak
+                            :disabled="brand !== 'other' && model !== 'other'"
+                            maxlength="{{ App\Support\VehicleCatalogInput::MODEL_MAX }}" placeholder="Tulis tipe"
+                            value="{{ $val('model_other', $vehicle?->model_other) }}"
+                            class="{{ $inputClass }} {{ $border('model_other') }}" :class="brand === 'other' ? '' : 'mt-2'" />
+                        @foreach (['vehicle_model_id', 'model_other'] as $field)
+                            @error($field)
+                                <p class="text-error-500 mt-1.5 text-theme-xs">{{ $message }}</p>
+                            @enderror
+                        @endforeach
                     </div>
                     <div>
                         <label for="vin" class="{{ $labelClass }}">No. Rangka (VIN)</label>
