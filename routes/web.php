@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Cms\AboutUsController;
+use App\Http\Controllers\Cms\DashboardController;
 use App\Http\Controllers\Cms\EventCategoryController;
 use App\Http\Controllers\Cms\EventController;
 use App\Http\Controllers\Cms\EventVideoController;
@@ -48,9 +49,7 @@ Route::post('/logout', [LoginController::class, 'destroy'])
 // CMS pages (hanya user yang sudah login & punya role CMS)
 Route::middleware(['auth', 'role:'.implode('|', User::CMS_ROLES)])->group(function () {
     // dashboard pages
-    Route::get('/', function () {
-        return view('pages.dashboard.ecommerce', ['title' => 'Dashboard']);
-    })->name('dashboard');
+    Route::get('/', DashboardController::class)->name('dashboard');
 
     // content website
     Route::resource('hero-banners', HeroBannerController::class)->except('show');
